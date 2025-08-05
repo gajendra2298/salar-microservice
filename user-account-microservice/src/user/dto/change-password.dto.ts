@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class ChangePasswordDto {
   @ApiProperty({
-    description: 'Current password of the user',
+    description: 'Current/old password of the user',
     example: 'OldPass123!',
     maxLength: 15,
     pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]'
@@ -29,6 +29,20 @@ export class ChangePasswordDto {
     message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
   })
   newPassword: string;
+
+  @ApiProperty({
+    description: 'Confirm new password (must match new password)',
+    example: 'NewPass123!',
+    maxLength: 15,
+    pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]'
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(15)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+    message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character',
+  })
+  confirmPassword: string;
 
   @ApiProperty({
     description: 'Transaction password for verification',

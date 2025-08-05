@@ -40,6 +40,21 @@ __decorate([
     __metadata("design:type", String)
 ], Funds.prototype, "type", void 0);
 __decorate([
+    (0, mongoose_1.Prop)({
+        type: String,
+        enum: [
+            'Referral Comm',
+            'Sponsor Comm',
+            'AuS Comm',
+            'Product Team Referral Commission',
+            'Nova Referral Commission',
+            'Royalty Referral Team Commission'
+        ],
+        required: false
+    }),
+    __metadata("design:type", String)
+], Funds.prototype, "commissionType", void 0);
+__decorate([
     (0, mongoose_1.Prop)({ type: Number, required: true }),
     __metadata("design:type", Number)
 ], Funds.prototype, "amount", void 0);

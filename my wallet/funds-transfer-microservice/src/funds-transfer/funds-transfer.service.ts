@@ -1,373 +1,651 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import axios, { AxiosError } from 'axios';
 import { Funds, FundsDocument } from './schemas/funds.schema';
 import { appConfig } from '../config/app.config';
+import axios from 'axios';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
 
 @Injectable()
 export class FundsTransferService {
-  private isTestMode = process.env.NODE_ENV === 'test';
-
   constructor(
     @InjectModel(Funds.name) private fundsModel: Model<FundsDocument>,
+    @Inject(REQUEST) private readonly request: Request,
   ) {}
 
-  async getDropdownValuesForFunds(userId: string) {
+  /********************************************************
+   Purpose: Get dropdown values for funds
+   Method: Get
+   Return: JSON String
+   ********************************************************/
+  async getDropdownValuesForFunds() {
     try {
-      if (this.isTestMode) {
-        // Mock data for testing
-        const userDetails = {
-          referralComm: 1000,
-          sponsorComm: 1000,
-          ausComm: 1000,
-          productTeamReferralCommission: 1000,
-          novaReferralCommission: 1000,
-          royaltyReferralTeamCommission: 1000,
-          funds: 1000,
-        };
-
-        return {
-          status: 1,
-          message: 'User details are: ',
-          data: userDetails,
-        };
+      const userId = this.extractUserIdFromRequest();
+      if (!userId) {
+        return { status: 0, message: 'User ID not found in request' };
       }
 
-      // Fetch user details from external API using axios
-      const response = await axios.get(`${appConfig.services.user.url}/api/users/${userId}/details`, {
-        timeout: appConfig.services.user.timeout,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${appConfig.api.token}`
-        }
-      });
-
-      if (response.status !== 200) {
-        throw new HttpException(
-          'Failed to fetch user details',
-          HttpStatus.BAD_REQUEST
-        );
+      // Get user details from user-account microservice via TCP call
+      const userDetails = await this.getUserDetails(userId);
+      if (!userDetails) {
+        return { status: 0, message: 'User details not found' };
       }
-
-      const userDetails = response.data;
 
       return {
         status: 1,
-        message: 'User details fetched successfully',
-        data: userDetails,
+        message: 'User details are: ',
+        data: {
+          sponserCommission: userDetails.sponserCommission || 0,
+          aurCommission: userDetails.aurCommission || 0,
+          gameCommission: userDetails.gameCommission || 0,
+          funds: userDetails.funds || 0
+        }
       };
     } catch (error) {
-      console.error('Error getting dropdown values:', error);
-      
-      if (error instanceof AxiosError) {
-        if (error.code === 'ECONNREFUSED') {
-          throw new HttpException(
-            'User service is unavailable',
-            HttpStatus.SERVICE_UNAVAILABLE
-          );
-        }
-        
-        if (error.response?.status === 404) {
-          throw new HttpException(
-            'User not found',
-            HttpStatus.NOT_FOUND
-          );
-        }
-        
-        if (error.response?.status === 401) {
-          throw new HttpException(
-            'Unauthorized access to user service',
-            HttpStatus.UNAUTHORIZED
-          );
-        }
-        
-        if (error.code === 'ETIMEDOUT') {
-          throw new HttpException(
-            'Request timeout - user service is slow',
-            HttpStatus.REQUEST_TIMEOUT
-          );
-        }
-      }
-      
-      throw new HttpException(
-        'Internal server error while fetching user details',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+      console.log(`error: ${error}`);
+      return { status: 0, message: 'Internal server error' };
     }
   }
 
-  async fundTransfer(transferData: {
-    userId: string;
-    registerId: string;
-    amount: number;
-    type: string;
-    transactionPassword: string;
-  }) {
+  /********************************************************
+   Purpose: Fund transfer
+   Method: Post
+   Authorisation: true
+   Parameter:
+   {
+       "registerId":"",
+       "amount": 100,
+       "type": "Sponser Commission" (or) "Aur Commission" (or) "Game Commission" (or) "Funds",
+       "transactionPassword": ""
+   }               
+   Return: JSON String
+   ********************************************************/
+  async fundTransfer(data: any) {
     try {
-      const { userId, registerId, amount, type, transactionPassword } = transferData;
+      const userId = this.extractUserIdFromRequest();
+      if (!userId) {
+        return { status: 0, message: 'User ID not found in request' };
+      }
+
+      data.userId = userId;
 
       // Validate required fields
-      if (!registerId || !amount || !type || !transactionPassword) {
-        if (this.isTestMode) {
-          return {
-            status: 0,
-            message: 'Please send all required fields',
-          };
-        }
-        throw new HttpException(
-          'Please send all required fields',
-          HttpStatus.BAD_REQUEST
-        );
+      const fieldsArray = ['registerId', 'amount', 'type', 'transactionPassword'];
+      const emptyFields = this.checkEmptyFields(data, fieldsArray);
+      if (emptyFields.length > 0) {
+        return { status: 0, message: 'Please send ' + emptyFields.toString() + ' fields required.' };
       }
 
-      if (this.isTestMode) {
-        // Mock validation for testing
-        if (transactionPassword !== 'validPassword') {
-          return {
-            status: 0,
-            message: 'Invalid transaction password',
-          };
-        }
-
-        if (registerId === 'SAME_USER') {
-          return {
-            status: 0,
-            message: 'Cannot transfer funds to the same registerId.',
-          };
-        }
-
-        const userBalance = 1000; // Mock balance
-        if (userBalance < amount) {
-          return {
-            status: 0,
-            message: `There is no sufficient amount in ${type}`,
-          };
-        }
-
-        // Generate transaction number
-        const fundsCount = await this.fundsModel.countDocuments();
-        const randomGenerator = this.generateRandomString(8);
-        const transactionNo = 'F' + randomGenerator + (fundsCount + 1);
-
-        // Calculate admin charges (example: 2%)
-        const adminCharges = amount * 0.02;
-        const netPayable = amount - adminCharges;
-
-        // Create funds transfer record
-        const newFund = await this.fundsModel.create({
-          userId,
-          receiverUserId: registerId,
-          type,
-          amount,
-          transactionNo,
-          status: 'Success',
-          adminCharges,
-          netPayable,
-        });
-
-        return {
-          status: 1,
-          message: 'Funds sent successfully',
-          data: {
-            transactionNo: newFund.transactionNo,
-            amount: newFund.amount,
-            netPayable: newFund.netPayable,
-            adminCharges: newFund.adminCharges,
-          },
-        };
+      // Get sender user details
+      const user = await this.getUserDetails(userId);
+      if (!user) {
+        return { status: 0, message: 'User Not Found' };
       }
 
-      // Validate transaction password using external service
-      try {
-        const authResponse = await axios.post(`${appConfig.services.auth.url}/api/auth/validate-password`, {
-          userId,
-          transactionPassword
-        }, {
-          timeout: appConfig.services.auth.timeout,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${appConfig.api.token}`
-          }
-        });
-
-        if (authResponse.data.valid !== true) {
-          throw new HttpException(
-            'Invalid transaction password',
-            HttpStatus.UNAUTHORIZED
-          );
-        }
-      } catch (authError) {
-        if (authError instanceof AxiosError) {
-          if (authError.response?.status === 401) {
-            throw new HttpException(
-              'Invalid transaction password',
-              HttpStatus.UNAUTHORIZED
-            );
-          }
-          if (authError.code === 'ECONNREFUSED') {
-            throw new HttpException(
-              'Authentication service unavailable',
-              HttpStatus.SERVICE_UNAVAILABLE
-            );
-          }
-        }
-        throw new HttpException(
-          'Authentication service error',
-          HttpStatus.INTERNAL_SERVER_ERROR
-        );
+      // Verify transaction password
+      const isPasswordValid = await this.verifyTransactionPassword(data.transactionPassword, user.transactionPassword);
+      if (!isPasswordValid) {
+        return { status: 0, message: 'Invalid transaction password' };
       }
 
-      // Validate receiver user exists using external service
-      try {
-        const userResponse = await axios.get(`${appConfig.services.user.url}/api/users/${registerId}`, {
-          timeout: appConfig.services.user.timeout,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${appConfig.api.token}`
-          }
-        });
-
-        if (userResponse.data.userId === userId) {
-          throw new HttpException(
-            'Cannot transfer funds to the same user',
-            HttpStatus.BAD_REQUEST
-          );
-        }
-      } catch (userError) {
-        if (userError instanceof AxiosError) {
-          if (userError.response?.status === 404) {
-            throw new HttpException(
-              'Receiver user not found',
-              HttpStatus.NOT_FOUND
-            );
-          }
-          if (userError.code === 'ECONNREFUSED') {
-            throw new HttpException(
-              'User service unavailable',
-              HttpStatus.SERVICE_UNAVAILABLE
-            );
-          }
-        }
-        throw userError;
+      // Validate receiver user details
+      const userDetails = await this.getUserByRegisterId(data.registerId);
+      if (!userDetails) {
+        return { status: 0, message: 'User details not found' };
       }
 
-      // Fetch user balance from external service
-      let userBalance;
-      try {
-        const balanceResponse = await axios.get(`${appConfig.services.balance.url}/api/balance/${userId}/${type}`, {
-          timeout: appConfig.services.balance.timeout,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${appConfig.api.token}`
-          }
-        });
-
-        userBalance = balanceResponse.data.balance;
-      } catch (balanceError) {
-        if (balanceError instanceof AxiosError) {
-          if (balanceError.code === 'ECONNREFUSED') {
-            throw new HttpException(
-              'Balance service unavailable',
-              HttpStatus.SERVICE_UNAVAILABLE
-            );
-          }
-        }
-        throw new HttpException(
-          'Failed to fetch user balance',
-          HttpStatus.INTERNAL_SERVER_ERROR
-        );
+      // Ensure the registerId is not the same as the logged-in user's registerId
+      if (user.registerId === data.registerId) {
+        return { status: 0, message: 'Cannot transfer funds to the same registerId.' };
       }
 
-      // Validate sufficient balance
-      if (userBalance < amount) {
-        throw new HttpException(
-          `Insufficient balance in ${type}. Available: ${userBalance}, Required: ${amount}`,
-          HttpStatus.BAD_REQUEST
-        );
+      data.receiverUserId = userDetails._id;
+
+      // Validate commission type and get key
+      const key = this.getCommissionKey(data.type);
+      if (!key) {
+        return { status: 0, message: 'Please send proper type' };
+      }
+
+      // Validate sufficient balance (except for PRT Commission)
+      if (key !== 'prtCommission') {
+        const hasSufficientBalance = await this.validateSufficientBalance(userId, key, data.amount);
+        if (!hasSufficientBalance) {
+          return { status: 0, message: `There is no sufficient amount in ${data.type}` };
+        }
       }
 
       // Generate transaction number
-      const fundsCount = await this.fundsModel.countDocuments();
-      const randomGenerator = this.generateRandomString(8);
-      const transactionNo = 'F' + randomGenerator + (fundsCount + 1);
-
-      // Calculate admin charges (example: 2%)
-      const adminCharges = amount * 0.02;
-      const netPayable = amount - adminCharges;
+      const transactionNo = await this.generateTransactionNo();
+      data.transactionNo = transactionNo;
+      data.status = 'Pending';
 
       // Create funds transfer record
-      const newFund = await this.fundsModel.create({
-        userId,
-        receiverUserId: registerId,
-        type,
-        amount,
-        transactionNo,
-        status: 'Success',
-        adminCharges,
-        netPayable,
+      const newFund = await this.fundsModel.create(data);
+      if (!newFund) {
+        return { status: 0, message: 'Failed to send funds' };
+      }
+
+      // Update wallet and commission details
+      if (key !== 'prtCommission') {
+        // Deduct from sender's commission
+        await this.updateUserCommission(userId, key, -data.amount);
+        
+        // Add to receiver's funds
+        await this.updateUserFunds(userDetails._id, data.amount);
+      } else {
+        // Handle PRT Commission (create PRT commission record)
+        await this.createPRTCommissionRecord(user.registerId, data.amount);
+      }
+
+      // Update user metrics
+      await this.updateUserMetrics(userId, key, data.amount, 'deduct');
+      await this.updateUserMetrics(userDetails._id, key, data.amount, 'add');
+
+      // Update fund status to Success
+      await this.fundsModel.findByIdAndUpdate(
+        newFund._id,
+        { status: 'Success' },
+        { new: true }
+      );
+
+      // Save transfer history
+      await this.saveTransferHistory({
+        senderUserId: userId,
+        receiverUserId: userDetails._id,
+        receiverCustomerRegisteredId: data.registerId,
+        customerName: userDetails.fullName || 'Unknown Customer',
+        commissionType: data.type,
+        amount: data.amount,
+        adminCharges: 0,
+        netPayable: data.amount,
+        fundsTransactionNo: transactionNo,
+        status: 'Success'
       });
 
-      if (!newFund) {
-        throw new HttpException(
-          'Failed to create transfer record',
-          HttpStatus.INTERNAL_SERVER_ERROR
-        );
-      }
+      return { status: 1, message: 'Funds sent successfully' };
 
-      // Update balances in external service
-      try {
-        await axios.post(`${appConfig.services.balance.url}/api/balance/transfer`, {
-          senderId: userId,
-          receiverId: registerId,
-          amount: netPayable,
-          type,
-          transactionNo: newFund.transactionNo
-        }, {
-          timeout: appConfig.services.user.timeout,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${appConfig.api.token}`
-          }
-        });
-      } catch (balanceUpdateError) {
-        console.error('Failed to update balances:', balanceUpdateError);
-        // Log the error but don't fail the transaction since it's already recorded
-      }
-
-      return {
-        status: 1,
-        message: 'Funds transferred successfully',
-        data: {
-          transactionNo: newFund.transactionNo,
-          amount: newFund.amount,
-          netPayable: newFund.netPayable,
-          adminCharges: newFund.adminCharges,
-          receiverId: registerId,
-          type: newFund.type,
-          status: newFund.status,
-        },
-      };
     } catch (error) {
-      console.error('Error in fund transfer:', error);
-      
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      
-      throw new HttpException(
-        'Internal server error during fund transfer',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
+      console.log('error- ', error);
+      return { status: 0, message: error.message || 'Internal server error' };
     }
   }
 
-  private generateRandomString(length: number): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  /********************************************************
+   Purpose: funds transfer history Listing
+   Method: Post
+   Authorisation: true
+   Parameter:
+   {
+       "page":1,
+       "pagesize":3,
+       "startDate":"2022-09-20",
+       "endDate":"2024-10-25",
+       "searchText": ""
+   }
+   Return: JSON String
+   ********************************************************/
+  async fundsTransferHistoryListing(data: any) {
+    try {
+      const userId = this.extractUserIdFromRequest();
+      if (!userId) {
+        return { status: 0, message: 'User ID not found in request' };
+      }
+
+      const skip = (parseInt(data.page) - 1) * parseInt(data.pagesize);
+      const sort = data.sort ? data.sort : { _id: -1 };
+      const limit = data.pagesize;
+
+      // Build query conditions
+      let queryConditions: any = { userId: userId };
+
+      // Date filter
+      if (data.startDate || data.endDate) {
+        queryConditions.createdAt = {};
+        if (data.startDate) {
+          queryConditions.createdAt.$gte = new Date(data.startDate);
+        }
+        if (data.endDate) {
+          queryConditions.createdAt.$lte = new Date(data.endDate);
+        }
+      }
+
+      // Search filter
+      if (data.searchText) {
+        const regex = new RegExp(data.searchText, 'i');
+        queryConditions.$or = [
+          { type: regex },
+          { transactionNo: regex }
+        ];
+      }
+
+      // Get funds transfer history with user lookup
+      const result = await this.fundsModel.aggregate([
+        { $match: queryConditions },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'receiverUserId',
+            foreignField: '_id',
+            as: 'receiver'
+          }
+        },
+        { $unwind: { path: '$receiver', preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            createdAt: 1,
+            transactionNo: 1,
+            commissionName: '$type',
+            amount: 1,
+            'receiver._id': 1,
+            'receiver.fullName': 1,
+            'receiver.registerId': 1,
+            status: 1,
+          },
+        },
+        { $sort: sort },
+        { $skip: skip },
+        { $limit: limit },
+      ]);
+
+      // Get total count
+      const total = await this.fundsModel.aggregate([
+        { $match: queryConditions },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'receiverUserId',
+            foreignField: '_id',
+            as: 'receiver'
+          }
+        },
+        { $unwind: { path: '$receiver', preserveNullAndEmptyArrays: true } },
+        { $project: { _id: 1 } },
+      ]);
+
+      return {
+        status: 1,
+        data: result,
+        page: data.page,
+        pagesize: data.pagesize,
+        total: total.length,
+      };
+
+    } catch (error) {
+      console.log('error- ', error);
+      return { status: 0, message: 'Internal server error' };
+    }
+  }
+
+  /********************************************************
+   Purpose: funds received history Listing
+   Method: Post
+   Authorisation: true
+   Parameter:
+   {
+       "page":1,
+       "pagesize":3,
+       "startDate":"2022-09-20",
+       "endDate":"2024-10-25",
+       "searchText": ""
+   }
+   Return: JSON String
+   ********************************************************/
+  async fundsReceivedHistoryListing(data: any) {
+    try {
+      const userId = this.extractUserIdFromRequest();
+      if (!userId) {
+        return { status: 0, message: 'User ID not found in request' };
+      }
+
+      const skip = (parseInt(data.page) - 1) * parseInt(data.pagesize);
+      const sort = data.sort ? data.sort : { _id: -1 };
+      const limit = data.pagesize;
+
+      // Build query conditions
+      let queryConditions: any = { receiverUserId: userId };
+
+      // Date filter
+      if (data.startDate || data.endDate) {
+        queryConditions.createdAt = {};
+        if (data.startDate) {
+          queryConditions.createdAt.$gte = new Date(data.startDate);
+        }
+        if (data.endDate) {
+          queryConditions.createdAt.$lte = new Date(data.endDate);
+        }
+      }
+
+      // Search filter
+      if (data.searchText) {
+        const regex = new RegExp(data.searchText, 'i');
+        queryConditions.$or = [
+          { type: regex },
+          { transactionNo: regex }
+        ];
+      }
+
+      // Get funds received history with user lookup
+      const result = await this.fundsModel.aggregate([
+        { $match: queryConditions },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'sender'
+          }
+        },
+        { $unwind: { path: '$sender', preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            createdAt: 1,
+            transactionNo: 1,
+            commissionName: '$type',
+            amount: 1,
+            'sender._id': 1,
+            'sender.fullName': 1,
+            'sender.registerId': 1,
+            'sender.imageUrl': 1,
+            status: 1,
+          },
+        },
+        { $sort: sort },
+        { $skip: skip },
+        { $limit: limit },
+      ]);
+
+      // Get total count
+      const total = await this.fundsModel.aggregate([
+        { $match: queryConditions },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userId',
+            foreignField: '_id',
+            as: 'sender'
+          }
+        },
+        { $unwind: { path: '$sender', preserveNullAndEmptyArrays: true } },
+        { $project: { _id: 1 } },
+      ]);
+
+      return {
+        status: 1,
+        data: result,
+        page: data.page,
+        pagesize: data.pagesize,
+        total: total.length,
+      };
+
+    } catch (error) {
+      console.log('error- ', error);
+      return { status: 0, message: 'Internal server error' };
+    }
+  }
+
+  // Helper methods
+  private extractUserIdFromRequest(): string | null {
+    try {
+      // Method 1: Extract from JWT token payload
+      const authHeader = this.request.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        const decoded = this.decodeJwtToken(token);
+        if (decoded && decoded.userId) {
+          return decoded.userId;
+        }
+      }
+
+      // Method 2: Extract from custom header
+      const userIdHeader = this.request.headers['x-user-id'] as string;
+      if (userIdHeader) {
+        return userIdHeader;
+      }
+
+      // Method 3: Extract from request body or query params
+      const bodyUserId = (this.request.body as any)?.userId;
+      if (bodyUserId) {
+        return bodyUserId;
+      }
+
+      const queryUserId = this.request.query.userId as string;
+      if (queryUserId) {
+        return queryUserId;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error extracting user ID from request:', error);
+      return null;
+    }
+  }
+
+  private decodeJwtToken(token: string): any {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('Error decoding JWT token:', error);
+      return null;
+    }
+  }
+
+  private async getUserDetails(userId: string) {
+    try {
+      const response = await axios.get(
+        `${appConfig.services.user.url}/users/${userId}`,
+        { 
+          timeout: appConfig.services.user.timeout,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': this.request.headers.authorization || ''
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      return null;
+    }
+  }
+
+  private async getUserByRegisterId(registerId: string) {
+    try {
+      const response = await axios.get(
+        `${appConfig.services.user.url}/users/register/${registerId}`,
+        { 
+          timeout: appConfig.services.user.timeout,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': this.request.headers.authorization || ''
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user by register ID:', error);
+      return null;
+    }
+  }
+
+  private async verifyTransactionPassword(inputPassword: string, savedPassword: string): Promise<boolean> {
+    try {
+      // This would typically use proper password hashing
+      // For now, using simple comparison
+      return inputPassword === savedPassword;
+    } catch (error) {
+      console.error('Error verifying transaction password:', error);
+      return false;
+    }
+  }
+
+  private getCommissionKey(type: string): string | null {
+    const commissionMap = {
+      'Sponser Commission': 'sponserCommission',
+      'Aur Commission': 'aurCommission',
+      'Game Commission': 'gameCommission',
+      'PRT Commission': 'prtCommission'
+    };
+    return commissionMap[type] || null;
+  }
+
+  private async validateSufficientBalance(userId: string, key: string, amount: number): Promise<boolean> {
+    try {
+      const userDetails = await this.getUserDetails(userId);
+      if (!userDetails) {
+        return false;
+      }
+      return userDetails[key] >= amount;
+    } catch (error) {
+      console.error('Error validating sufficient balance:', error);
+      return false;
+    }
+  }
+
+  private async generateTransactionNo(): Promise<string> {
+    try {
+      const fundsCount = await this.fundsModel.countDocuments();
+      const randomGenerator = this.generateRandomString(8, 'capital');
+      return 'F' + randomGenerator + (fundsCount + 1);
+    } catch (error) {
+      console.error('Error generating transaction number:', error);
+      const timestamp = new Date().getTime();
+      const random = Math.floor(Math.random() * 1000);
+      return `F${timestamp}${random}`;
+    }
+  }
+
+  private generateRandomString(length: number, type: string): string {
+    const chars = type === 'capital' ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' : 'abcdefghijklmnopqrstuvwxyz';
     let result = '';
     for (let i = 0; i < length; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return result;
+  }
+
+  private async updateUserCommission(userId: string, key: string, amount: number) {
+    try {
+      const response = await axios.post(
+        `${appConfig.services.user.url}/users/update-commission`,
+        {
+          userId: userId,
+          commissionType: key,
+          amount: amount,
+          operation: amount > 0 ? 'add' : 'deduct'
+        },
+        { 
+          timeout: appConfig.services.user.timeout,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': this.request.headers.authorization || ''
+          }
+        }
+      );
+      return response.status === 200;
+    } catch (error) {
+      console.error('Error updating user commission:', error);
+      return false;
+    }
+  }
+
+  private async updateUserFunds(userId: string, amount: number) {
+    try {
+      const response = await axios.post(
+        `${appConfig.services.user.url}/users/update-funds`,
+        {
+          userId: userId,
+          amount: amount,
+          operation: 'add'
+        },
+        { 
+          timeout: appConfig.services.user.timeout,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': this.request.headers.authorization || ''
+          }
+        }
+      );
+      return response.status === 200;
+    } catch (error) {
+      console.error('Error updating user funds:', error);
+      return false;
+    }
+  }
+
+  private async createPRTCommissionRecord(registerId: string, amount: number) {
+    try {
+      const response = await axios.post(
+        `${appConfig.services.user.url}/users/prt-commission`,
+        {
+          registerId: registerId,
+          prtCommission: amount,
+          status: 'debited'
+        },
+        { 
+          timeout: appConfig.services.user.timeout,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': this.request.headers.authorization || ''
+          }
+        }
+      );
+      return response.status === 200;
+    } catch (error) {
+      console.error('Error creating PRT commission record:', error);
+      return false;
+    }
+  }
+
+  private async updateUserMetrics(userId: string, key: string, amount: number, operation: 'add' | 'deduct') {
+    try {
+      const response = await axios.post(
+        `${appConfig.services.user.url}/users/metrics`,
+        {
+          userId: userId,
+          commissionType: key,
+          amount: amount,
+          operation: operation
+        },
+        { 
+          timeout: appConfig.services.user.timeout,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': this.request.headers.authorization || ''
+          }
+        }
+      );
+      return response.status === 200;
+    } catch (error) {
+      console.error('Error updating user metrics:', error);
+      return false;
+    }
+  }
+
+  private checkEmptyFields(data: any, fieldsArray: string[]): string[] {
+    const emptyFields: string[] = [];
+    for (const field of fieldsArray) {
+      if (!data[field] || data[field] === '') {
+        emptyFields.push(field);
+      }
+    }
+    return emptyFields;
+  }
+
+  private async saveTransferHistory(historyData: any) {
+    try {
+      const historyServiceUrl = process.env.HISTORY_SERVICE_URL || 'http://localhost:3005';
+      await axios.post(`${historyServiceUrl}/funds-transfer-history/save-transfer`, historyData, {
+        timeout: 5000
+      });
+    } catch (error) {
+      console.error('Error saving transfer history:', error.message);
+    }
   }
 } 

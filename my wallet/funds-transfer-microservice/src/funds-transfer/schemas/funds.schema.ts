@@ -26,6 +26,20 @@ export class Funds {
   })
   type: string;
 
+  @Prop({ 
+    type: String, 
+    enum: [
+      'Referral Comm',
+      'Sponsor Comm', 
+      'AuS Comm',
+      'Product Team Referral Commission',
+      'Nova Referral Commission',
+      'Royalty Referral Team Commission'
+    ],
+    required: false 
+  })
+  commissionType: string;
+
   @Prop({ type: Number, required: true })
   amount: number;
 

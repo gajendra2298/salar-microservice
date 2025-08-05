@@ -15,6 +15,10 @@ export interface AppConfig {
             url: string;
             timeout: number;
         };
+        wallet: {
+            url: string;
+            timeout: number;
+        };
     };
     api: {
         token: string;

@@ -101,6 +101,11 @@ export class UserService {
         throw new NotFoundException('User Not Found');
       }
 
+      // Check if new password and confirm password match
+      if (changePasswordDto.newPassword !== changePasswordDto.confirmPassword) {
+        throw new BadRequestException('New password and confirm password do not match');
+      }
+
       // Verify transaction password
       const transactionPasswordStatus = await this.verifyPassword({
         password: changePasswordDto.transactionPassword,
@@ -208,6 +213,11 @@ export class UserService {
         throw new NotFoundException('User not found');
       }
 
+      // Check if new transaction password and confirm password match
+      if (changeTransactionPasswordDto.newTransactionPassword !== changeTransactionPasswordDto.confirmTransactionPassword) {
+        throw new BadRequestException('New transaction password and confirm password do not match');
+      }
+
       if (changeTransactionPasswordDto.otp !== userDetails.otp || changeTransactionPasswordDto.otp === '') {
         throw new BadRequestException('Please enter valid OTP');
       }
@@ -235,11 +245,4 @@ export class UserService {
     }
   }
 
-  async getUserProfile(userId: string) {
-    const user = await this.userModel.findById(userId).select('-password -transactionPassword');
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    return user;
-  }
 } 

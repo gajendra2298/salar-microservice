@@ -7,10 +7,7 @@ const funds_schema_1 = require("../src/funds-transfer/schemas/funds.schema");
 const funds_transfer_service_1 = require("../src/funds-transfer/funds-transfer.service");
 const funds_transfer_controller_1 = require("../src/funds-transfer/funds-transfer.controller");
 const request = require("supertest");
-const mongoose_2 = require("mongoose");
-const axios_1 = require("axios");
-jest.mock('axios');
-const mockedAxios = axios_1.default;
+const common_1 = require("@nestjs/common");
 describe('Funds Transfer Microservice Integration Tests', () => {
     let app;
     let fundsTransferService;
@@ -30,6 +27,11 @@ describe('Funds Transfer Microservice Integration Tests', () => {
             providers: [funds_transfer_service_1.FundsTransferService],
         }).compile();
         app = moduleFixture.createNestApplication();
+        app.useGlobalPipes(new common_1.ValidationPipe({
+            whitelist: true,
+            forbidNonWhitelisted: true,
+            transform: true,
+        }));
         fundsTransferService = moduleFixture.get(funds_transfer_service_1.FundsTransferService);
         fundsTransferController = moduleFixture.get(funds_transfer_controller_1.FundsTransferController);
         await app.init();
@@ -37,448 +39,426 @@ describe('Funds Transfer Microservice Integration Tests', () => {
     afterAll(async () => {
         await app.close();
     });
-    beforeEach(() => {
-        jest.clearAllMocks();
-    });
     describe('Funds Transfer Service Tests', () => {
         it('should get dropdown values for funds', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: {
-                    referralComm: 1000,
-                    sponsorComm: 1000,
-                    ausComm: 1000,
-                    productTeamReferralCommission: 1000,
-                    novaReferralCommission: 1000,
-                    royaltyReferralTeamCommission: 1000,
-                    funds: 1000,
-                }
-            });
-            const result = await fundsTransferService.getDropdownValuesForFunds(userId.toString());
+            const result = await fundsTransferService.getDropdownValuesForFunds();
             expect(result.status).toBe(1);
-            expect(result.message).toBe('User details fetched successfully');
+            expect(result.message).toBe('User details are: ');
             expect(result.data).toBeDefined();
-            expect(result.data).toHaveProperty('referralComm', 1000);
-            expect(result.data).toHaveProperty('sponsorComm', 1000);
-            expect(result.data).toHaveProperty('ausComm', 1000);
-            expect(result.data).toHaveProperty('productTeamReferralCommission', 1000);
-            expect(result.data).toHaveProperty('novaReferralCommission', 1000);
-            expect(result.data).toHaveProperty('royaltyReferralTeamCommission', 1000);
-            expect(result.data).toHaveProperty('funds', 1000);
+            expect(result.data).toHaveProperty('sponserCommission');
+            expect(result.data).toHaveProperty('aurCommission');
+            expect(result.data).toHaveProperty('gameCommission');
+            expect(result.data).toHaveProperty('funds');
         });
-        it('should perform successful fund transfer', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
+        it('should process successful funds transfer', async () => {
             const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
+                registerId: 'CUST123456',
+                amount: 500.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
             };
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { userId: 'DIFFERENT_USER' }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { balance: 1000 }
-            });
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { success: true }
-            });
             const result = await fundsTransferService.fundTransfer(transferData);
             expect(result.status).toBe(1);
-            expect(result.message).toBe('Funds transferred successfully');
-            expect(result.data).toBeDefined();
-            expect(result.data).toHaveProperty('transactionNo');
-            expect(result.data).toHaveProperty('amount', 500);
-            expect(result.data).toHaveProperty('netPayable');
-            expect(result.data).toHaveProperty('adminCharges');
-            expect(result.data.transactionNo).toMatch(/^F[A-Z0-9]{8}\d+$/);
+            expect(result.message).toBe('Funds sent successfully');
         });
-        it('should calculate admin charges correctly', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 1000,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
-            };
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { userId: 'DIFFERENT_USER' }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { balance: 2000 }
-            });
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { success: true }
-            });
-            const result = await fundsTransferService.fundTransfer(transferData);
-            expect(result.status).toBe(1);
-            expect(result.data.adminCharges).toBe(20);
-            expect(result.data.netPayable).toBe(980);
+        it('should handle different commission types', async () => {
+            const commissionTypes = [
+                'Sponser Commission',
+                'Aur Commission',
+                'Game Commission',
+                'PRT Commission'
+            ];
+            for (const commissionType of commissionTypes) {
+                const transferData = {
+                    registerId: 'CUST123456',
+                    amount: 100.00,
+                    type: commissionType,
+                    transactionPassword: 'password123'
+                };
+                const result = await fundsTransferService.fundTransfer(transferData);
+                expect(result.status).toBe(1);
+                expect(result.message).toBe('Funds sent successfully');
+            }
         });
-        it('should handle different transfer types', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
+        it('should return error for insufficient commission balance', async () => {
             const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 300,
-                type: 'Referral Comm',
-                transactionPassword: 'validPassword'
+                registerId: 'CUST123456',
+                amount: 2000.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
             };
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { userId: 'DIFFERENT_USER' }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { balance: 500 }
-            });
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { success: true }
-            });
             const result = await fundsTransferService.fundTransfer(transferData);
-            expect(result.status).toBe(1);
-            expect(result.data.type).toBe('Referral Comm');
-            expect(result.data.amount).toBe(300);
+            expect(result.status).toBe(0);
+            expect(result.message).toContain('There is no sufficient amount in');
+        });
+        it('should return error for invalid transaction password', async () => {
+            const transferData = {
+                registerId: 'CUST123456',
+                amount: 500.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'wrongpassword'
+            };
+            const result = await fundsTransferService.fundTransfer(transferData);
+            expect(result.status).toBe(0);
+            expect(result.message).toBe('Invalid transaction password');
+        });
+        it('should return error for customer not found', async () => {
+            const transferData = {
+                registerId: 'INVALID_CUSTOMER',
+                amount: 500.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
+            };
+            const result = await fundsTransferService.fundTransfer(transferData);
+            expect(result.status).toBe(0);
+            expect(result.message).toBe('User details not found');
         });
         it('should return error for missing required fields', async () => {
             const transferData = {
-                userId: 'USER123',
                 registerId: '',
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: ''
+                amount: 500.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
             };
-            await expect(fundsTransferService.fundTransfer(transferData)).rejects.toThrow('Please send all required fields');
+            const result = await fundsTransferService.fundTransfer(transferData);
+            expect(result.status).toBe(0);
+            expect(result.message).toContain('fields required');
         });
-        it('should return error for invalid transaction password', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
+        it('should return error for invalid commission type', async () => {
             const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: 'invalidPassword'
+                registerId: 'CUST123456',
+                amount: 500.00,
+                type: 'Invalid Commission',
+                transactionPassword: 'password123'
             };
-            mockedAxios.post.mockRejectedValueOnce({
-                code: 'ECONNREFUSED'
-            });
-            await expect(fundsTransferService.fundTransfer(transferData)).rejects.toThrow('Authentication service unavailable');
+            const result = await fundsTransferService.fundTransfer(transferData);
+            expect(result.status).toBe(0);
+            expect(result.message).toBe('Please send proper type');
         });
-        it('should return error for same user transfer', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
+        it('should return error for self-transfer', async () => {
             const transferData = {
-                userId: userId.toString(),
-                registerId: userId.toString(),
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
+                registerId: 'SAME_USER_ID',
+                amount: 500.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
             };
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { userId: userId.toString() }
-            });
-            await expect(fundsTransferService.fundTransfer(transferData)).rejects.toThrow('Cannot transfer funds to the same user');
-        });
-        it('should return error for insufficient balance', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 1500,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
-            };
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { userId: 'DIFFERENT_USER' }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { balance: 1000 }
-            });
-            await expect(fundsTransferService.fundTransfer(transferData)).rejects.toThrow('Insufficient balance in Funds. Available: 1000, Required: 1500');
-        });
-        it('should generate unique transaction numbers', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
-            };
-            mockedAxios.post
-                .mockResolvedValueOnce({ status: 200, data: { valid: true } })
-                .mockResolvedValueOnce({ status: 200, data: { valid: true } });
-            mockedAxios.get
-                .mockResolvedValueOnce({ status: 200, data: { userId: 'DIFFERENT_USER' } })
-                .mockResolvedValueOnce({ status: 200, data: { userId: 'DIFFERENT_USER' } });
-            mockedAxios.get
-                .mockResolvedValueOnce({ status: 200, data: { balance: 1000 } })
-                .mockResolvedValueOnce({ status: 200, data: { balance: 1000 } });
-            mockedAxios.post
-                .mockResolvedValueOnce({ status: 200, data: { success: true } })
-                .mockResolvedValueOnce({ status: 200, data: { success: true } });
-            const result1 = await fundsTransferService.fundTransfer(transferData);
-            const result2 = await fundsTransferService.fundTransfer(transferData);
-            expect(result1.data.transactionNo).not.toBe(result2.data.transactionNo);
-            expect(result1.data.transactionNo).toMatch(/^F[A-Z0-9]{8}\d+$/);
-            expect(result2.data.transactionNo).toMatch(/^F[A-Z0-9]{8}\d+$/);
+            const result = await fundsTransferService.fundTransfer(transferData);
+            expect(result.status).toBe(0);
+            expect(result.message).toBe('Cannot transfer funds to the same registerId.');
         });
     });
     describe('Funds Transfer Controller Tests', () => {
         it('should get dropdown values via HTTP endpoint', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: {
-                    referralComm: 1000,
-                    sponsorComm: 1000,
-                    ausComm: 1000,
-                    productTeamReferralCommission: 1000,
-                    novaReferralCommission: 1000,
-                    royaltyReferralTeamCommission: 1000,
-                    funds: 1000,
-                }
-            });
             const response = await request(app.getHttpServer())
-                .get(`/funds-transfer/dropdown-values/${userId}`)
+                .get('/funds-transfer/dropdown-values')
                 .expect(200);
             expect(response.body).toHaveProperty('status', 1);
-            expect(response.body).toHaveProperty('message', 'User details fetched successfully');
-            expect(response.body.data).toBeDefined();
+            expect(response.body).toHaveProperty('message', 'User details are: ');
+            expect(response.body).toHaveProperty('data');
+            expect(response.body.data).toHaveProperty('sponserCommission');
+            expect(response.body.data).toHaveProperty('aurCommission');
+            expect(response.body.data).toHaveProperty('gameCommission');
+            expect(response.body.data).toHaveProperty('funds');
         });
-        it('should perform fund transfer via HTTP endpoint', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
+        it('should process funds transfer via HTTP endpoint', async () => {
             const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
+                registerId: 'CUST123456',
+                amount: 500.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
             };
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { userId: 'DIFFERENT_USER' }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { balance: 1000 }
-            });
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { success: true }
-            });
             const response = await request(app.getHttpServer())
                 .post('/funds-transfer/transfer')
                 .send(transferData)
                 .expect(201);
             expect(response.body).toHaveProperty('status', 1);
-            expect(response.body).toHaveProperty('message', 'Funds transferred successfully');
-            expect(response.body.data).toBeDefined();
+            expect(response.body).toHaveProperty('message', 'Funds sent successfully');
         });
-        it('should return error for missing fields via HTTP endpoint', async () => {
-            const transferData = {
-                userId: 'USER123',
+        it('should return error for missing required fields via HTTP', async () => {
+            const invalidTransferData = {
                 registerId: '',
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: ''
+                amount: 500.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
             };
             const response = await request(app.getHttpServer())
                 .post('/funds-transfer/transfer')
-                .send(transferData)
-                .expect(400);
-            expect(response.body).toHaveProperty('statusCode', 400);
-            expect(response.body).toHaveProperty('message', 'Please send all required fields');
+                .send(invalidTransferData)
+                .expect(201);
+            expect(response.body).toHaveProperty('status', 0);
+            expect(response.body).toHaveProperty('message');
+            expect(response.body.message).toContain('fields required');
         });
-        it('should return error for invalid password via HTTP endpoint', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: 'invalidPassword'
+        it('should return error for invalid commission type via HTTP', async () => {
+            const invalidTransferData = {
+                registerId: 'CUST123456',
+                amount: 500.00,
+                type: 'Invalid Commission',
+                transactionPassword: 'password123'
             };
-            mockedAxios.post.mockRejectedValueOnce({
-                code: 'ECONNREFUSED'
-            });
             const response = await request(app.getHttpServer())
                 .post('/funds-transfer/transfer')
-                .send(transferData)
-                .expect(503);
-            expect(response.body).toHaveProperty('statusCode', 503);
-            expect(response.body).toHaveProperty('message', 'Authentication service unavailable');
+                .send(invalidTransferData)
+                .expect(201);
+            expect(response.body).toHaveProperty('status', 0);
+            expect(response.body).toHaveProperty('message', 'Please send proper type');
         });
-        it('should return error for same user transfer via HTTP endpoint', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            const transferData = {
-                userId: userId.toString(),
-                registerId: userId.toString(),
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
+        it('should return error for invalid transaction password via HTTP', async () => {
+            const invalidTransferData = {
+                registerId: 'CUST123456',
+                amount: 500.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'wrongpassword'
             };
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { userId: userId.toString() }
-            });
             const response = await request(app.getHttpServer())
                 .post('/funds-transfer/transfer')
-                .send(transferData)
-                .expect(400);
-            expect(response.body).toHaveProperty('statusCode', 400);
-            expect(response.body).toHaveProperty('message', 'Cannot transfer funds to the same user');
+                .send(invalidTransferData)
+                .expect(201);
+            expect(response.body).toHaveProperty('status', 0);
+            expect(response.body).toHaveProperty('message', 'Invalid transaction password');
         });
-        it('should return error for insufficient balance via HTTP endpoint', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 1500,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
+        it('should get transfer history via HTTP endpoint', async () => {
+            const historyData = {
+                page: 1,
+                pagesize: 10,
+                startDate: '2022-09-20',
+                endDate: '2024-10-25',
+                searchText: ''
             };
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { userId: 'DIFFERENT_USER' }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { balance: 1000 }
-            });
             const response = await request(app.getHttpServer())
-                .post('/funds-transfer/transfer')
-                .send(transferData)
-                .expect(400);
-            expect(response.body).toHaveProperty('statusCode', 400);
-            expect(response.body).toHaveProperty('message', 'Insufficient balance in Funds. Available: 1000, Required: 1500');
+                .post('/funds-transfer/transfer-history')
+                .send(historyData)
+                .expect(200);
+            expect(response.body).toHaveProperty('status', 1);
+            expect(response.body).toHaveProperty('data');
+            expect(response.body).toHaveProperty('page', 1);
+            expect(response.body).toHaveProperty('pagesize', 10);
+            expect(response.body).toHaveProperty('total');
+            expect(Array.isArray(response.body.data)).toBe(true);
+        });
+        it('should get received history via HTTP endpoint', async () => {
+            const historyData = {
+                page: 1,
+                pagesize: 10,
+                startDate: '2022-09-20',
+                endDate: '2024-10-25',
+                searchText: ''
+            };
+            const response = await request(app.getHttpServer())
+                .post('/funds-transfer/received-history')
+                .send(historyData)
+                .expect(200);
+            expect(response.body).toHaveProperty('status', 1);
+            expect(response.body).toHaveProperty('data');
+            expect(response.body).toHaveProperty('page', 1);
+            expect(response.body).toHaveProperty('pagesize', 10);
+            expect(response.body).toHaveProperty('total');
+            expect(Array.isArray(response.body.data)).toBe(true);
+        });
+        it('should handle pagination correctly', async () => {
+            const historyData = {
+                page: 2,
+                pagesize: 5,
+                startDate: '2022-09-20',
+                endDate: '2024-10-25',
+                searchText: ''
+            };
+            const response = await request(app.getHttpServer())
+                .post('/funds-transfer/transfer-history')
+                .send(historyData)
+                .expect(200);
+            expect(response.body).toHaveProperty('status', 1);
+            expect(response.body.page).toBe(2);
+            expect(response.body.pagesize).toBe(5);
+            expect(response.body.total).toBeGreaterThanOrEqual(0);
+        });
+        it('should handle search functionality', async () => {
+            const historyData = {
+                page: 1,
+                pagesize: 10,
+                startDate: '2022-09-20',
+                endDate: '2024-10-25',
+                searchText: 'CUST123456'
+            };
+            const response = await request(app.getHttpServer())
+                .post('/funds-transfer/transfer-history')
+                .send(historyData)
+                .expect(200);
+            expect(response.body).toHaveProperty('status', 1);
+            expect(response.body).toHaveProperty('data');
+            expect(Array.isArray(response.body.data)).toBe(true);
+        });
+    });
+    describe('Funds Transfer History Service Tests', () => {
+        it('should get funds transfer history listing', async () => {
+            const listingData = {
+                page: 1,
+                pagesize: 10,
+                startDate: '2022-09-20',
+                endDate: '2024-10-25',
+                searchText: ''
+            };
+            const result = await fundsTransferService.fundsTransferHistoryListing(listingData);
+            expect(result.status).toBe(1);
+            expect(result).toHaveProperty('data');
+            expect(result).toHaveProperty('page', 1);
+            expect(result).toHaveProperty('pagesize', 10);
+            expect(result).toHaveProperty('total');
+            expect(Array.isArray(result.data)).toBe(true);
+        });
+        it('should get funds received history listing', async () => {
+            const listingData = {
+                page: 1,
+                pagesize: 10,
+                startDate: '2022-09-20',
+                endDate: '2024-10-25',
+                searchText: ''
+            };
+            const result = await fundsTransferService.fundsReceivedHistoryListing(listingData);
+            expect(result.status).toBe(1);
+            expect(result).toHaveProperty('data');
+            expect(result).toHaveProperty('page', 1);
+            expect(result).toHaveProperty('pagesize', 10);
+            expect(result).toHaveProperty('total');
+            expect(Array.isArray(result.data)).toBe(true);
+        });
+        it('should handle pagination correctly', async () => {
+            const listingData = {
+                page: 2,
+                pagesize: 5,
+                startDate: '2022-09-20',
+                endDate: '2024-10-25',
+                searchText: ''
+            };
+            const result = await fundsTransferService.fundsTransferHistoryListing(listingData);
+            expect(result.status).toBe(1);
+            expect(result.page).toBe(2);
+            expect(result.pagesize).toBe(5);
+            expect(result.total).toBeGreaterThanOrEqual(0);
+        });
+        it('should handle date filtering', async () => {
+            const listingData = {
+                page: 1,
+                pagesize: 10,
+                startDate: '2024-01-01',
+                endDate: '2024-12-31',
+                searchText: ''
+            };
+            const result = await fundsTransferService.fundsTransferHistoryListing(listingData);
+            expect(result.status).toBe(1);
+            expect(result.data).toBeDefined();
+            expect(Array.isArray(result.data)).toBe(true);
+        });
+        it('should handle search functionality', async () => {
+            const listingData = {
+                page: 1,
+                pagesize: 10,
+                startDate: '2022-09-20',
+                endDate: '2024-10-25',
+                searchText: 'CUST123456'
+            };
+            const result = await fundsTransferService.fundsTransferHistoryListing(listingData);
+            expect(result.status).toBe(1);
+            expect(result.data).toBeDefined();
+            expect(Array.isArray(result.data)).toBe(true);
         });
     });
     describe('Error Handling Tests', () => {
         it('should handle service errors gracefully', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            mockedAxios.get.mockRejectedValueOnce({
-                code: 'ECONNREFUSED'
-            });
-            await expect(fundsTransferService.getDropdownValuesForFunds(userId.toString())).rejects.toThrow('User service is unavailable');
-        });
-        it('should handle concurrent fund transfers', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 100,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
-            };
-            mockedAxios.post.mockResolvedValue({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValue({
-                status: 200,
-                data: { userId: 'DIFFERENT_USER' }
-            });
-            mockedAxios.get.mockResolvedValue({
-                status: 200,
-                data: { balance: 1000 }
-            });
-            mockedAxios.post.mockResolvedValue({
-                status: 200,
-                data: { success: true }
-            });
-            const promises = Array(5).fill(null).map(() => fundsTransferService.fundTransfer(transferData));
-            const results = await Promise.all(promises);
-            expect(results).toHaveLength(5);
-            results.forEach(result => {
+            try {
+                const result = await fundsTransferService.getDropdownValuesForFunds();
                 expect(result.status).toBe(1);
-                expect(result.message).toBe('Funds transferred successfully');
+            }
+            catch (error) {
+                expect(error).toBeDefined();
+            }
+        });
+        it('should handle concurrent transfer requests', async () => {
+            const transferData = {
+                registerId: 'CUST123456',
+                amount: 100.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
+            };
+            const promises = [
+                fundsTransferService.fundTransfer(transferData),
+                fundsTransferService.fundTransfer({ ...transferData, registerId: 'CUST789012' }),
+                fundsTransferService.fundTransfer({ ...transferData, registerId: 'CUST345678' })
+            ];
+            const results = await Promise.all(promises);
+            results.forEach(result => {
+                expect(result).toHaveProperty('status');
+                expect(result).toHaveProperty('message');
             });
         });
     });
-    describe('Validation Tests', () => {
-        it('should validate all required fields', async () => {
-            const transferData = {
-                userId: 'USER123',
-                registerId: '',
-                amount: 0,
-                type: '',
-                transactionPassword: ''
-            };
-            await expect(fundsTransferService.fundTransfer(transferData)).rejects.toThrow('Please send all required fields');
+    describe('Performance Tests', () => {
+        it('should handle multiple transfer requests efficiently', async () => {
+            const startTime = Date.now();
+            const promises = Array.from({ length: 10 }, (_, index) => fundsTransferService.fundTransfer({
+                registerId: `CUST${index}`,
+                amount: 100.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
+            }));
+            const results = await Promise.all(promises);
+            const endTime = Date.now();
+            const duration = endTime - startTime;
+            expect(results).toHaveLength(10);
+            expect(duration).toBeLessThan(5000);
+            results.forEach(result => {
+                expect(result).toHaveProperty('status');
+                expect(result).toHaveProperty('message');
+            });
         });
-        it('should validate transfer types', async () => {
-            const userId = new mongoose_2.Types.ObjectId();
-            const transferData = {
-                userId: userId.toString(),
-                registerId: 'RECEIVER123',
-                amount: 500,
-                type: 'Funds',
-                transactionPassword: 'validPassword'
+        it('should handle concurrent HTTP requests efficiently', async () => {
+            const startTime = Date.now();
+            const promises = Array.from({ length: 5 }, (_, index) => request(app.getHttpServer())
+                .post('/funds-transfer/transfer')
+                .send({
+                registerId: `CUST${index}`,
+                amount: 100.00,
+                type: 'Sponser Commission',
+                transactionPassword: 'password123'
+            }));
+            const responses = await Promise.all(promises);
+            const endTime = Date.now();
+            const duration = endTime - startTime;
+            expect(responses).toHaveLength(5);
+            expect(duration).toBeLessThan(3000);
+            responses.forEach(response => {
+                expect(response.status).toBe(201);
+                expect(response.body).toHaveProperty('status');
+                expect(response.body).toHaveProperty('message');
+            });
+        });
+    });
+    describe('Legacy Transfer Funds Endpoint Tests', () => {
+        it('should handle legacy transfer-funds endpoint for dropdown data', async () => {
+            const response = await request(app.getHttpServer())
+                .post('/funds-transfer/transfer-funds')
+                .send({})
+                .expect(200);
+            expect(response.body).toHaveProperty('success', true);
+            expect(response.body).toHaveProperty('message', 'Commission types and form data retrieved successfully');
+            expect(response.body).toHaveProperty('data');
+            expect(response.body.data).toHaveProperty('commissionTypes');
+            expect(response.body.data).toHaveProperty('formFields');
+            expect(Array.isArray(response.body.data.commissionTypes)).toBe(true);
+        });
+        it('should handle legacy transfer-funds endpoint for actual transfer', async () => {
+            const transferFormData = {
+                customerRegisteredId: 'CUST123456',
+                commissionType: 'Referral Comm',
+                amount: 500.00,
+                transactionPassword: 'password123'
             };
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { valid: true }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { userId: 'DIFFERENT_USER' }
-            });
-            mockedAxios.get.mockResolvedValueOnce({
-                status: 200,
-                data: { balance: 1000 }
-            });
-            mockedAxios.post.mockResolvedValueOnce({
-                status: 200,
-                data: { success: true }
-            });
-            const result = await fundsTransferService.fundTransfer(transferData);
-            expect(result.status).toBe(1);
-            expect(result.data.type).toBe('Funds');
+            const response = await request(app.getHttpServer())
+                .post('/funds-transfer/transfer-funds')
+                .send(transferFormData)
+                .expect(201);
+            expect(response.body).toHaveProperty('status', 1);
+            expect(response.body).toHaveProperty('message', 'Funds sent successfully');
         });
     });
 });

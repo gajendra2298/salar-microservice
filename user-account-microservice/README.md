@@ -1,219 +1,121 @@
-# User Module Microservice
+# User Account Microservice
 
-A NestJS microservice for user management with password and transaction password functionality, including OTP verification via SMS and email.
+This microservice handles user password management with two key features as specified in the requirements.
 
 ## Features
 
-### (i) Change Password
-- **Enter Old Password**: Validates current password
-- **Enter New Password**: New password with validation (max 15 characters, must contain uppercase, lowercase, number, and special character)
-- **Transaction Password**: Required for password change verification
-
-### (ii) Change Transaction Password
-- **Change Transaction Password Request**: Sends OTP to both SMS and email
-- **Enter OTP**: 6-character alphanumeric validation
-- **Enter New Transaction Password**: New transaction password with validation
-
-## Prerequisites
-
-- Node.js (v16 or higher)
-- MongoDB
-- SendGrid account (for email)
-- Bulk SMS Gateway account (for SMS)
-
-## Installation
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Copy environment variables:
-   ```bash
-   copy env.example .env
-   ```
-
-4. Configure your environment variables in `.env`:
-   - MongoDB connection string
-   - JWT secret
-   - SendGrid API key
-   - Bulk SMS Gateway credentials
-
-## Running the Application
-
-### Development
-```bash
-npm run start:dev
-```
-
-### Production
-```bash
-npm run build
-npm run start:prod
-```
-
-## API Endpoints
-
 ### 1. Change Password
-**POST** `/user/change-password`
+Allows users to change their main password with the following validations:
 
-**Headers:**
-- `Authorization: Bearer <jwt-token>`
-- `Content-Type: application/json`
+**Required Fields:**
+- **Old Password**: Current password validation
+- **New Password**: New password with format validation
+- **Confirm Password**: Must match new password
+- **Transaction Password**: For verification
+
+**Password Format Requirements:**
+- Max length: 15 characters
+- Must contain: One uppercase letter, one lowercase letter, one number, and one special character
+- Pattern: `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]`
+
+**API Endpoint:**
+```
+POST /user/change-password
+Authorization: Bearer <JWT_TOKEN>
+```
 
 **Request Body:**
 ```json
 {
   "oldPassword": "OldPass123!",
   "newPassword": "NewPass123!",
+  "confirmPassword": "NewPass123!",
   "transactionPassword": "TransPass123!"
 }
 ```
 
-**Response:**
-```json
-{
-  "status": 1,
-  "message": "Password updated successfully"
-}
+### 2. Change Transaction Password
+Allows users to change their transaction password using OTP verification:
+
+**Step 1: Request OTP**
+- **Mobile No**: Auto-filled from signup (disabled field)
+- **Email ID**: Auto-filled from signup (disabled field)
+- **Get OTP**: Sends 6-digit numeric OTP to both SMS and Email
+
+**Step 2: Change Transaction Password**
+- **Enter OTP**: 6-digit numeric validation
+- **New Transaction Password**: New password with format validation
+- **Confirm Transaction Password**: Must match new transaction password
+
+**API Endpoints:**
+
+1. **Request OTP:**
 ```
-
----
-
-### 2. Change Transaction Password Request (Send OTP)
-**POST** `/user/change-transaction-password-request`
-
-**Headers:**
-- `Authorization: Bearer <jwt-token>`
-- `Content-Type: application/json`
+POST /user/change-transaction-password-request
+Authorization: Bearer <JWT_TOKEN>
+```
 
 **Request Body:**
 ```json
 {
   "emailId": "user@example.com",
-  "mobileNo": "+1234567890"
+  "mobileNo": "+919876543210"
 }
 ```
 
-**Response:**
-```json
-{
-  "status": 1,
-  "message": "OTP sent successfully"
-}
+2. **Change Transaction Password:**
 ```
-
----
-
-### 3. Change Transaction Password
-**POST** `/user/change-transaction-password`
-
-**Headers:**
-- `Authorization: Bearer <jwt-token>`
-- `Content-Type: application/json`
+POST /user/change-transaction-password
+Authorization: Bearer <JWT_TOKEN>
+```
 
 **Request Body:**
 ```json
 {
-  "otp": "ABC123",
-  "newTransactionPassword": "NewTransPass123!"
+  "otp": "123456",
+  "newTransactionPassword": "NewTransPass123!",
+  "confirmTransactionPassword": "NewTransPass123!"
 }
 ```
 
-**Response:**
-```json
-{
-  "status": 1,
-  "message": "Transaction password updated successfully"
-}
-```
+## Password Validation Rules
 
----
-
-### 4. Get User Profile
-**GET** `/user/profile`
-
-**Headers:**
-- `Authorization: Bearer <jwt-token>`
-
-**Response:**
-```json
-{
-  "_id": "...",
-  "fullName": "...",
-  "emailId": "...",
-  ...
-}
-```
-
----
-
-## Validation Rules
-
-### Password Validation
-- Maximum length: 15 characters
-- Must contain:
-  - At least one uppercase letter
-  - At least one lowercase letter
-  - At least one number
+Both main password and transaction password follow the same format requirements:
+- **Max Length**: 15 characters
+- **Must Include**: 
+  - At least one uppercase letter (A-Z)
+  - At least one lowercase letter (a-z)
+  - At least one number (0-9)
   - At least one special character (@$!%*?&)
 
-### OTP Validation
-- Maximum length: 6 characters
-- Alphanumeric only (A-Z, a-z, 0-9)
+## OTP System
+
+- **Format**: 6-digit numeric only
+- **Delivery**: Sent to both email and SMS
+- **SMS**: Only for Indian users
+- **Validation**: OTP must be entered exactly as received
+
+## Error Messages
+
+- **Password Mismatch**: "New password and confirm password do not match"
+- **Invalid Transaction Password**: "Invalid transaction password"
+- **Invalid OTP**: "Please enter valid OTP"
+- **Password Format**: "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"
+
+## Authentication
+
+All endpoints require JWT authentication. Include the JWT token in the Authorization header:
+```
+Authorization: Bearer <your-jwt-token>
+```
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| MONGODB_URI | MongoDB connection string | mongodb://localhost:27017/user-microservice |
-| JWT_SECRET | JWT signing secret | your-secret-key |
-| SEND_GRID_TOKEN | SendGrid API key | - |
-| SMS_USER | Bulk SMS Gateway username | - |
-| SMS_PASSWORD | Bulk SMS Gateway password | - |
-| SMS_SENDER | Bulk SMS Gateway sender ID | - |
-| SMS_TRANS_PASSWORD_OTP_TEMPLATEID | SMS template ID | - |
-| PORT | Server port | 3000 |
-
-## Error Handling
-
-The service includes comprehensive error handling for:
-- Invalid passwords
-- Password mismatch
-- Invalid OTP
-- User not found
-- Validation errors
-
-## Security Features
-
-- Password hashing using bcrypt
-- JWT-based authentication
-- Input validation and sanitization
-- CORS enabled
-- Environment-based configuration
-
-## Testing
-
-```bash
-# Unit tests
-npm run test
-
-# E2E tests
-npm run test:e2e
-
-# Test coverage
-npm run test:cov
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License. 
+Required environment variables (see `env.example`):
+- `MONGODB_URI`: MongoDB connection string
+- `JWT_SECRET`: JWT secret key
+- `SEND_GRID_TOKEN`: SendGrid API key for email
+- `SMS_USER`: SMS gateway username
+- `SMS_PASSWORD`: SMS gateway password
+- `SMS_SENDER`: SMS sender ID
+- `PORT`: Server port (default: 3000) 

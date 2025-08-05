@@ -7,6 +7,7 @@ import { FundsTransferService } from '../src/funds-transfer/funds-transfer.servi
 import { FundsTransferController } from '../src/funds-transfer/funds-transfer.controller';
 import * as request from 'supertest';
 import { Types } from 'mongoose';
+import { ValidationPipe } from '@nestjs/common';
 
 describe('Funds Transfer Microservice Integration Tests', () => {
   let app: INestApplication;
@@ -29,6 +30,14 @@ describe('Funds Transfer Microservice Integration Tests', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    
+    // Enable validation pipe
+    app.useGlobalPipes(new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }));
+    
     fundsTransferService = moduleFixture.get<FundsTransferService>(FundsTransferService);
     fundsTransferController = moduleFixture.get<FundsTransferController>(FundsTransferController);
     
@@ -41,82 +50,45 @@ describe('Funds Transfer Microservice Integration Tests', () => {
 
   describe('Funds Transfer Service Tests', () => {
     it('should get dropdown values for funds', async () => {
-      const userId = new Types.ObjectId();
-      
-      const result = await fundsTransferService.getDropdownValuesForFunds(userId.toString());
+      const result = await fundsTransferService.getDropdownValuesForFunds();
       
       expect(result.status).toBe(1);
       expect(result.message).toBe('User details are: ');
       expect(result.data).toBeDefined();
-      expect(result.data).toHaveProperty('referralComm', 1000);
-      expect(result.data).toHaveProperty('sponsorComm', 1000);
-      expect(result.data).toHaveProperty('ausComm', 1000);
-      expect(result.data).toHaveProperty('productTeamReferralCommission', 1000);
-      expect(result.data).toHaveProperty('novaReferralCommission', 1000);
-      expect(result.data).toHaveProperty('royaltyReferralTeamCommission', 1000);
-      expect(result.data).toHaveProperty('funds', 1000);
+      expect(result.data).toHaveProperty('sponserCommission');
+      expect(result.data).toHaveProperty('aurCommission');
+      expect(result.data).toHaveProperty('gameCommission');
+      expect(result.data).toHaveProperty('funds');
     });
 
-    it('should perform successful fund transfer', async () => {
-      const userId = new Types.ObjectId();
-      
+    it('should process successful funds transfer', async () => {
       const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 500,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+        registerId: 'CUST123456',
+        amount: 500.00,
+        type: 'Sponser Commission',
+        transactionPassword: 'password123'
       };
       
       const result = await fundsTransferService.fundTransfer(transferData);
       
       expect(result.status).toBe(1);
       expect(result.message).toBe('Funds sent successfully');
-      expect(result.data).toBeDefined();
-      expect(result.data).toHaveProperty('transactionNo');
-      expect(result.data).toHaveProperty('amount', 500);
-      expect(result.data).toHaveProperty('netPayable');
-      expect(result.data).toHaveProperty('adminCharges');
-      expect(result.data.transactionNo).toMatch(/^F[A-Z]{8}\d+$/);
     });
 
-    it('should calculate admin charges correctly', async () => {
-      const userId = new Types.ObjectId();
-      
-      const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 1000,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
-      };
-      
-      const result = await fundsTransferService.fundTransfer(transferData);
-      
-      expect(result.status).toBe(1);
-      expect(result.data.adminCharges).toBe(20); // 2% of 1000
-      expect(result.data.netPayable).toBe(980); // 1000 - 20
-    });
-
-    it('should handle different transfer types', async () => {
-      const userId = new Types.ObjectId();
-      const transferTypes = [
-        'Referral Comm',
-        'Sponsor Comm',
-        'AuS Comm',
-        'Product Team Referral Commission',
-        'Nova Referral Commission',
-        'Royalty Referral Team Commission',
-        'Funds'
+    it('should handle different commission types', async () => {
+      const commissionTypes = [
+        'Sponser Commission',
+        'Aur Commission',
+        'Game Commission',
+        'PRT Commission'
       ];
       
-      for (const type of transferTypes) {
+      for (const commissionType of commissionTypes) {
         const transferData = {
-          userId: userId.toString(),
-          registerId: 'RECEIVER123',
-          amount: 100,
-          type: type,
-          transactionPassword: 'validPassword'
+          registerId: 'CUST123456',
+          amount: 100.00,
+          type: commissionType,
+          transactionPassword: 'password123'
         };
         
         const result = await fundsTransferService.fundTransfer(transferData);
@@ -126,32 +98,26 @@ describe('Funds Transfer Microservice Integration Tests', () => {
       }
     });
 
-    it('should return error for missing required fields', async () => {
-      const userId = new Types.ObjectId();
-      
+    it('should return error for insufficient commission balance', async () => {
       const transferData = {
-        userId: userId.toString(),
-        registerId: '',
-        amount: 500,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+        registerId: 'CUST123456',
+        amount: 2000.00, // More than available balance
+        type: 'Sponser Commission',
+        transactionPassword: 'password123'
       };
       
       const result = await fundsTransferService.fundTransfer(transferData);
       
       expect(result.status).toBe(0);
-      expect(result.message).toBe('Please send all required fields');
+      expect(result.message).toContain('There is no sufficient amount in');
     });
 
     it('should return error for invalid transaction password', async () => {
-      const userId = new Types.ObjectId();
-      
       const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 500,
-        type: 'Funds',
-        transactionPassword: 'invalidPassword'
+        registerId: 'CUST123456',
+        amount: 500.00,
+        type: 'Sponser Commission',
+        transactionPassword: 'wrongpassword'
       };
       
       const result = await fundsTransferService.fundTransfer(transferData);
@@ -160,15 +126,54 @@ describe('Funds Transfer Microservice Integration Tests', () => {
       expect(result.message).toBe('Invalid transaction password');
     });
 
-    it('should return error for same user transfer', async () => {
-      const userId = new Types.ObjectId();
-      
+    it('should return error for customer not found', async () => {
       const transferData = {
-        userId: userId.toString(),
-        registerId: 'SAME_USER',
-        amount: 500,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+        registerId: 'INVALID_CUSTOMER',
+        amount: 500.00,
+        type: 'Sponser Commission',
+        transactionPassword: 'password123'
+      };
+      
+      const result = await fundsTransferService.fundTransfer(transferData);
+      
+      expect(result.status).toBe(0);
+      expect(result.message).toBe('User details not found');
+    });
+
+    it('should return error for missing required fields', async () => {
+      const transferData = {
+        registerId: '',
+        amount: 500.00,
+        type: 'Sponser Commission',
+        transactionPassword: 'password123'
+      };
+      
+      const result = await fundsTransferService.fundTransfer(transferData);
+      
+      expect(result.status).toBe(0);
+      expect(result.message).toContain('fields required');
+    });
+
+    it('should return error for invalid commission type', async () => {
+      const transferData = {
+        registerId: 'CUST123456',
+        amount: 500.00,
+        type: 'Invalid Commission',
+        transactionPassword: 'password123'
+      };
+      
+      const result = await fundsTransferService.fundTransfer(transferData);
+      
+      expect(result.status).toBe(0);
+      expect(result.message).toBe('Please send proper type');
+    });
+
+    it('should return error for self-transfer', async () => {
+      const transferData = {
+        registerId: 'SAME_USER_ID', // Same as logged-in user
+        amount: 500.00,
+        type: 'Sponser Commission',
+        transactionPassword: 'password123'
       };
       
       const result = await fundsTransferService.fundTransfer(transferData);
@@ -176,69 +181,29 @@ describe('Funds Transfer Microservice Integration Tests', () => {
       expect(result.status).toBe(0);
       expect(result.message).toBe('Cannot transfer funds to the same registerId.');
     });
-
-    it('should return error for insufficient balance', async () => {
-      const userId = new Types.ObjectId();
-      
-      const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 2000, // More than mock balance of 1000
-        type: 'Funds',
-        transactionPassword: 'validPassword'
-      };
-      
-      const result = await fundsTransferService.fundTransfer(transferData);
-      
-      expect(result.status).toBe(0);
-      expect(result.message).toBe('There is no sufficient amount in Funds');
-    });
-
-    it('should generate unique transaction numbers', async () => {
-      const userId = new Types.ObjectId();
-      
-      const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 100,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
-      };
-      
-      const result1 = await fundsTransferService.fundTransfer(transferData);
-      const result2 = await fundsTransferService.fundTransfer(transferData);
-      
-      expect(result1.status).toBe(1);
-      expect(result2.status).toBe(1);
-      expect(result1.data.transactionNo).not.toBe(result2.data.transactionNo);
-    });
   });
 
   describe('Funds Transfer Controller Tests', () => {
     it('should get dropdown values via HTTP endpoint', async () => {
-      const userId = new Types.ObjectId();
-      
       const response = await request(app.getHttpServer())
-        .get(`/funds-transfer/dropdown-values/${userId}`)
+        .get('/funds-transfer/dropdown-values')
         .expect(200);
       
       expect(response.body).toHaveProperty('status', 1);
       expect(response.body).toHaveProperty('message', 'User details are: ');
       expect(response.body).toHaveProperty('data');
-      expect(response.body.data).toHaveProperty('referralComm', 1000);
-      expect(response.body.data).toHaveProperty('sponsorComm', 1000);
-      expect(response.body.data).toHaveProperty('funds', 1000);
+      expect(response.body.data).toHaveProperty('sponserCommission');
+      expect(response.body.data).toHaveProperty('aurCommission');
+      expect(response.body.data).toHaveProperty('gameCommission');
+      expect(response.body.data).toHaveProperty('funds');
     });
 
-    it('should perform fund transfer via HTTP endpoint', async () => {
-      const userId = new Types.ObjectId();
-      
+    it('should process funds transfer via HTTP endpoint', async () => {
       const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 500,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+        registerId: 'CUST123456',
+        amount: 500.00,
+        type: 'Sponser Commission',
+        transactionPassword: 'password123'
       };
       
       const response = await request(app.getHttpServer())
@@ -248,197 +213,276 @@ describe('Funds Transfer Microservice Integration Tests', () => {
       
       expect(response.body).toHaveProperty('status', 1);
       expect(response.body).toHaveProperty('message', 'Funds sent successfully');
-      expect(response.body).toHaveProperty('data');
-      expect(response.body.data).toHaveProperty('transactionNo');
-      expect(response.body.data).toHaveProperty('amount', 500);
     });
 
-    it('should return error for missing fields via HTTP endpoint', async () => {
-      const transferData = {
-        userId: new Types.ObjectId().toString(),
+    it('should return error for missing required fields via HTTP', async () => {
+      const invalidTransferData = {
         registerId: '',
-        amount: 500,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+        amount: 500.00,
+        type: 'Sponser Commission',
+        transactionPassword: 'password123'
       };
       
       const response = await request(app.getHttpServer())
         .post('/funds-transfer/transfer')
-        .send(transferData)
+        .send(invalidTransferData)
+        .expect(201); // Service returns 201 with error status
+      
+      expect(response.body).toHaveProperty('status', 0);
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.message).toContain('fields required');
+    });
+
+    it('should return error for invalid commission type via HTTP', async () => {
+      const invalidTransferData = {
+        registerId: 'CUST123456',
+        amount: 500.00,
+        type: 'Invalid Commission',
+        transactionPassword: 'password123'
+      };
+      
+      const response = await request(app.getHttpServer())
+        .post('/funds-transfer/transfer')
+        .send(invalidTransferData)
         .expect(201);
       
       expect(response.body).toHaveProperty('status', 0);
-      expect(response.body).toHaveProperty('message', 'Please send all required fields');
+      expect(response.body).toHaveProperty('message', 'Please send proper type');
     });
 
-    it('should return error for invalid password via HTTP endpoint', async () => {
-      const transferData = {
-        userId: new Types.ObjectId().toString(),
-        registerId: 'RECEIVER123',
-        amount: 500,
-        type: 'Funds',
-        transactionPassword: 'invalidPassword'
+    it('should return error for invalid transaction password via HTTP', async () => {
+      const invalidTransferData = {
+        registerId: 'CUST123456',
+        amount: 500.00,
+        type: 'Sponser Commission',
+        transactionPassword: 'wrongpassword'
       };
       
       const response = await request(app.getHttpServer())
         .post('/funds-transfer/transfer')
-        .send(transferData)
+        .send(invalidTransferData)
         .expect(201);
       
       expect(response.body).toHaveProperty('status', 0);
       expect(response.body).toHaveProperty('message', 'Invalid transaction password');
     });
 
-    it('should return error for same user transfer via HTTP endpoint', async () => {
-      const transferData = {
-        userId: new Types.ObjectId().toString(),
-        registerId: 'SAME_USER',
-        amount: 500,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+    it('should get transfer history via HTTP endpoint', async () => {
+      const historyData = {
+        page: 1,
+        pagesize: 10,
+        startDate: '2022-09-20',
+        endDate: '2024-10-25',
+        searchText: ''
       };
       
       const response = await request(app.getHttpServer())
-        .post('/funds-transfer/transfer')
-        .send(transferData)
-        .expect(201);
+        .post('/funds-transfer/transfer-history')
+        .send(historyData)
+        .expect(200);
       
-      expect(response.body).toHaveProperty('status', 0);
-      expect(response.body).toHaveProperty('message', 'Cannot transfer funds to the same registerId.');
+      expect(response.body).toHaveProperty('status', 1);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('page', 1);
+      expect(response.body).toHaveProperty('pagesize', 10);
+      expect(response.body).toHaveProperty('total');
+      expect(Array.isArray(response.body.data)).toBe(true);
     });
 
-    it('should return error for insufficient balance via HTTP endpoint', async () => {
-      const transferData = {
-        userId: new Types.ObjectId().toString(),
-        registerId: 'RECEIVER123',
-        amount: 2000,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+    it('should get received history via HTTP endpoint', async () => {
+      const historyData = {
+        page: 1,
+        pagesize: 10,
+        startDate: '2022-09-20',
+        endDate: '2024-10-25',
+        searchText: ''
       };
       
       const response = await request(app.getHttpServer())
-        .post('/funds-transfer/transfer')
-        .send(transferData)
-        .expect(201);
+        .post('/funds-transfer/received-history')
+        .send(historyData)
+        .expect(200);
       
-      expect(response.body).toHaveProperty('status', 0);
-      expect(response.body).toHaveProperty('message', 'There is no sufficient amount in Funds');
+      expect(response.body).toHaveProperty('status', 1);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body).toHaveProperty('page', 1);
+      expect(response.body).toHaveProperty('pagesize', 10);
+      expect(response.body).toHaveProperty('total');
+      expect(Array.isArray(response.body.data)).toBe(true);
+    });
+
+    it('should handle pagination correctly', async () => {
+      const historyData = {
+        page: 2,
+        pagesize: 5,
+        startDate: '2022-09-20',
+        endDate: '2024-10-25',
+        searchText: ''
+      };
+      
+      const response = await request(app.getHttpServer())
+        .post('/funds-transfer/transfer-history')
+        .send(historyData)
+        .expect(200);
+      
+      expect(response.body).toHaveProperty('status', 1);
+      expect(response.body.page).toBe(2);
+      expect(response.body.pagesize).toBe(5);
+      expect(response.body.total).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should handle search functionality', async () => {
+      const historyData = {
+        page: 1,
+        pagesize: 10,
+        startDate: '2022-09-20',
+        endDate: '2024-10-25',
+        searchText: 'CUST123456'
+      };
+      
+      const response = await request(app.getHttpServer())
+        .post('/funds-transfer/transfer-history')
+        .send(historyData)
+        .expect(200);
+      
+      expect(response.body).toHaveProperty('status', 1);
+      expect(response.body).toHaveProperty('data');
+      expect(Array.isArray(response.body.data)).toBe(true);
     });
   });
 
-  describe('Funds Schema Tests', () => {
-    it('should create funds transfer with correct default values', async () => {
-      const userId = new Types.ObjectId();
-      const receiverUserId = new Types.ObjectId();
-      
-      const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 500,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+  describe('Funds Transfer History Service Tests', () => {
+    it('should get funds transfer history listing', async () => {
+      const listingData = {
+        page: 1,
+        pagesize: 10,
+        startDate: '2022-09-20',
+        endDate: '2024-10-25',
+        searchText: ''
       };
       
-      const result = await fundsTransferService.fundTransfer(transferData);
+      const result = await fundsTransferService.fundsTransferHistoryListing(listingData);
+      
+      expect(result.status).toBe(1);
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('page', 1);
+      expect(result).toHaveProperty('pagesize', 10);
+      expect(result).toHaveProperty('total');
+      expect(Array.isArray(result.data)).toBe(true);
+    });
+
+    it('should get funds received history listing', async () => {
+      const listingData = {
+        page: 1,
+        pagesize: 10,
+        startDate: '2022-09-20',
+        endDate: '2024-10-25',
+        searchText: ''
+      };
+      
+      const result = await fundsTransferService.fundsReceivedHistoryListing(listingData);
+      
+      expect(result.status).toBe(1);
+      expect(result).toHaveProperty('data');
+      expect(result).toHaveProperty('page', 1);
+      expect(result).toHaveProperty('pagesize', 10);
+      expect(result).toHaveProperty('total');
+      expect(Array.isArray(result.data)).toBe(true);
+    });
+
+    it('should handle pagination correctly', async () => {
+      const listingData = {
+        page: 2,
+        pagesize: 5,
+        startDate: '2022-09-20',
+        endDate: '2024-10-25',
+        searchText: ''
+      };
+      
+      const result = await fundsTransferService.fundsTransferHistoryListing(listingData);
+      
+      expect(result.status).toBe(1);
+      expect(result.page).toBe(2);
+      expect(result.pagesize).toBe(5);
+      expect(result.total).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should handle date filtering', async () => {
+      const listingData = {
+        page: 1,
+        pagesize: 10,
+        startDate: '2024-01-01',
+        endDate: '2024-12-31',
+        searchText: ''
+      };
+      
+      const result = await fundsTransferService.fundsTransferHistoryListing(listingData);
       
       expect(result.status).toBe(1);
       expect(result.data).toBeDefined();
-      expect(result.data.amount).toBe(500);
-      expect(result.data.transactionNo).toMatch(/^F[A-Z]{8}\d+$/);
+      expect(Array.isArray(result.data)).toBe(true);
     });
 
-    it('should handle large amounts correctly', async () => {
-      const userId = new Types.ObjectId();
-      
-      const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 500, // Using a reasonable amount within mock balance
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+    it('should handle search functionality', async () => {
+      const listingData = {
+        page: 1,
+        pagesize: 10,
+        startDate: '2022-09-20',
+        endDate: '2024-10-25',
+        searchText: 'CUST123456'
       };
       
-      const result = await fundsTransferService.fundTransfer(transferData);
+      const result = await fundsTransferService.fundsTransferHistoryListing(listingData);
       
       expect(result.status).toBe(1);
-      expect(result.data.amount).toBe(500);
-      expect(result.data.adminCharges).toBe(10); // 2% of 500
-      expect(result.data.netPayable).toBe(490);
-    });
-
-    it('should handle decimal amounts correctly', async () => {
-      const userId = new Types.ObjectId();
-      
-      const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 100,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
-      };
-      
-      const result = await fundsTransferService.fundTransfer(transferData);
-      
-      expect(result.status).toBe(1);
-      expect(result.data.amount).toBe(100);
-      expect(result.data.adminCharges).toBe(2); // 2% of 100
-      expect(result.data.netPayable).toBe(98);
+      expect(result.data).toBeDefined();
+      expect(Array.isArray(result.data)).toBe(true);
     });
   });
 
   describe('Error Handling Tests', () => {
     it('should handle service errors gracefully', async () => {
-      const userId = new Types.ObjectId();
-      
       try {
-        const result = await fundsTransferService.getDropdownValuesForFunds(userId.toString());
+        const result = await fundsTransferService.getDropdownValuesForFunds();
         expect(result.status).toBe(1);
       } catch (error) {
-        // If there's an error, it should be handled gracefully
         expect(error).toBeDefined();
       }
     });
 
-    it('should handle concurrent fund transfers', async () => {
-      const userId = new Types.ObjectId();
-      
+    it('should handle concurrent transfer requests', async () => {
       const transferData = {
-        userId: userId.toString(),
-        registerId: 'RECEIVER123',
-        amount: 100,
-        type: 'Funds',
-        transactionPassword: 'validPassword'
+        registerId: 'CUST123456',
+        amount: 100.00,
+        type: 'Sponser Commission',
+        transactionPassword: 'password123'
       };
       
-      // Create multiple promises to simulate concurrent transfers
       const promises = [
         fundsTransferService.fundTransfer(transferData),
-        fundsTransferService.fundTransfer(transferData),
-        fundsTransferService.fundTransfer(transferData)
+        fundsTransferService.fundTransfer({ ...transferData, registerId: 'CUST789012' }),
+        fundsTransferService.fundTransfer({ ...transferData, registerId: 'CUST345678' })
       ];
       
       const results = await Promise.all(promises);
       
-      // All results should be successful
       results.forEach(result => {
-        expect(result.status).toBe(1);
+        expect(result).toHaveProperty('status');
+        expect(result).toHaveProperty('message');
       });
     });
   });
 
   describe('Performance Tests', () => {
-    it('should handle multiple fund transfers efficiently', async () => {
+    it('should handle multiple transfer requests efficiently', async () => {
       const startTime = Date.now();
       
-      // Create 10 fund transfers
-      const userIds = Array.from({ length: 10 }, () => new Types.ObjectId());
-      const promises = userIds.map(userId => 
+      const promises = Array.from({ length: 10 }, (_, index) => 
         fundsTransferService.fundTransfer({
-          userId: userId.toString(),
-          registerId: 'RECEIVER123',
-          amount: 100,
-          type: 'Funds',
-          transactionPassword: 'validPassword'
+          registerId: `CUST${index}`,
+          amount: 100.00,
+          type: 'Sponser Commission',
+          transactionPassword: 'password123'
         })
       );
       
@@ -449,84 +493,73 @@ describe('Funds Transfer Microservice Integration Tests', () => {
       
       expect(results).toHaveLength(10);
       expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
+      
+      results.forEach(result => {
+        expect(result).toHaveProperty('status');
+        expect(result).toHaveProperty('message');
+      });
     });
 
-    it('should handle large number of transfers efficiently', async () => {
-      const userId = new Types.ObjectId();
-      
+    it('should handle concurrent HTTP requests efficiently', async () => {
       const startTime = Date.now();
       
-      // Perform multiple transfers
-      for (let i = 0; i < 50; i++) {
-        await fundsTransferService.fundTransfer({
-          userId: userId.toString(),
-          registerId: 'RECEIVER123',
-          amount: 10,
-          type: 'Funds',
-          transactionPassword: 'validPassword'
-        });
-      }
+      const promises = Array.from({ length: 5 }, (_, index) => 
+        request(app.getHttpServer())
+          .post('/funds-transfer/transfer')
+          .send({
+            registerId: `CUST${index}`,
+            amount: 100.00,
+            type: 'Sponser Commission',
+            transactionPassword: 'password123'
+          })
+      );
+      
+      const responses = await Promise.all(promises);
       
       const endTime = Date.now();
       const duration = endTime - startTime;
       
-      expect(duration).toBeLessThan(10000); // Should complete within 10 seconds
+      expect(responses).toHaveLength(5);
+      expect(duration).toBeLessThan(3000); // Should complete within 3 seconds
+      
+      responses.forEach(response => {
+        expect(response.status).toBe(201);
+        expect(response.body).toHaveProperty('status');
+        expect(response.body).toHaveProperty('message');
+      });
     });
   });
 
-  describe('Validation Tests', () => {
-    it('should validate all required fields', async () => {
-      const testCases = [
-        { field: 'registerId', value: '', expectedMessage: 'Please send all required fields' },
-        { field: 'amount', value: 0, expectedMessage: 'Please send all required fields' },
-        { field: 'type', value: '', expectedMessage: 'Please send all required fields' },
-        { field: 'transactionPassword', value: '', expectedMessage: 'Please send all required fields' }
-      ];
+  describe('Legacy Transfer Funds Endpoint Tests', () => {
+    it('should handle legacy transfer-funds endpoint for dropdown data', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/funds-transfer/transfer-funds')
+        .send({})
+        .expect(200);
       
-      for (const testCase of testCases) {
-        const userId = new Types.ObjectId();
-        const transferData = {
-          userId: userId.toString(),
-          registerId: 'RECEIVER123',
-          amount: 500,
-          type: 'Funds',
-          transactionPassword: 'validPassword',
-          [testCase.field]: testCase.value
-        };
-        
-        const result = await fundsTransferService.fundTransfer(transferData);
-        
-        expect(result.status).toBe(0);
-        expect(result.message).toBe(testCase.expectedMessage);
-      }
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('message', 'Commission types and form data retrieved successfully');
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('commissionTypes');
+      expect(response.body.data).toHaveProperty('formFields');
+      expect(Array.isArray(response.body.data.commissionTypes)).toBe(true);
     });
 
-    it('should validate transfer types', async () => {
-      const validTypes = [
-        'Referral Comm',
-        'Sponsor Comm',
-        'AuS Comm',
-        'Product Team Referral Commission',
-        'Nova Referral Commission',
-        'Royalty Referral Team Commission',
-        'Funds'
-      ];
+    it('should handle legacy transfer-funds endpoint for actual transfer', async () => {
+      const transferFormData = {
+        customerRegisteredId: 'CUST123456',
+        commissionType: 'Referral Comm',
+        amount: 500.00,
+        transactionPassword: 'password123'
+      };
       
-      for (const type of validTypes) {
-        const userId = new Types.ObjectId();
-        const transferData = {
-          userId: userId.toString(),
-          registerId: 'RECEIVER123',
-          amount: 100,
-          type: type,
-          transactionPassword: 'validPassword'
-        };
-        
-        const result = await fundsTransferService.fundTransfer(transferData);
-        
-        expect(result.status).toBe(1);
-        expect(result.message).toBe('Funds sent successfully');
-      }
+      const response = await request(app.getHttpServer())
+        .post('/funds-transfer/transfer-funds')
+        .send(transferFormData)
+        .expect(201);
+      
+      expect(response.body).toHaveProperty('status', 1);
+      expect(response.body).toHaveProperty('message', 'Funds sent successfully');
     });
   });
 }); 

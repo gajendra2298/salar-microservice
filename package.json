@@ -1,0 +1,42 @@
+{
+  "name": "mathiox-microservices",
+  "version": "1.0.0",
+  "description": "Mathiox - All Microservices",
+  "scripts": {
+    "start": "concurrently \"npm run start:wallet\" \"npm run start:credit-debit\" \"npm run start:funds-transfer\" \"npm run start:funds-received\" \"npm run start:funds-history\" \"npm run start:product-team\" \"npm run start:sponsor-team\" \"npm run start:user-account\"",
+    "start:wallet": "cd \"my wallet/wallet-microservice\" && npm run start:dev",
+    "start:credit-debit": "cd \"my wallet/credit-debit-microservice\" && npm run start:dev",
+    "start:funds-transfer": "cd \"my wallet/funds-transfer-microservice\" && npm run start:dev",
+    "start:funds-received": "cd \"my wallet/funds-received-microservice\" && npm run start:dev",
+    "start:funds-history": "cd \"my wallet/funds-transfer-history-microservice\" && npm run start:dev",
+    "start:product-team": "cd product-team-microservice && npm run start:dev",
+    "start:sponsor-team": "cd sponsor-team-microservice && npm run start:dev",
+    "start:user-account": "cd user-account-microservice && npm run start:dev",
+    "install:all": "npm install && cd \"my wallet\" && npm run install:all && cd ../product-team-microservice && npm install && cd ../sponsor-team-microservice && npm install && cd ../user-account-microservice && npm install",
+    "build:all": "cd \"my wallet\" && npm run build:all && cd ../product-team-microservice && npm run build && cd ../sponsor-team-microservice && npm run build && cd ../user-account-microservice && npm run build",
+    "test:all": "concurrently \"npm run test:wallet\" \"npm run test:credit-debit\" \"npm run test:funds-transfer\" \"npm run test:funds-received\" \"npm run test:funds-history\" \"npm run test:product-team\" \"npm run test:sponsor-team\" \"npm run test:user-account\"",
+    "test:wallet": "cd \"my wallet/wallet-microservice\" && npm test",
+    "test:credit-debit": "cd \"my wallet/credit-debit-microservice\" && npm test",
+    "test:funds-transfer": "cd \"my wallet/funds-transfer-microservice\" && npm test",
+    "test:funds-received": "cd \"my wallet/funds-received-microservice\" && npm test",
+    "test:funds-history": "cd \"my wallet/funds-transfer-history-microservice\" && npm test",
+    "test:product-team": "cd product-team-microservice && npm test",
+    "test:sponsor-team": "cd sponsor-team-microservice && npm test",
+    "test:user-account": "cd user-account-microservice && npm test",
+    "test:all:sequential": "npm run test:wallet && npm run test:credit-debit && npm run test:funds-transfer && npm run test:funds-received && npm run test:funds-history && npm run test:product-team && npm run test:sponsor-team && npm run test:user-account",
+    "test:all:coverage": "concurrently \"npm run test:wallet:coverage\" \"npm run test:credit-debit:coverage\" \"npm run test:funds-transfer:coverage\" \"npm run test:funds-received:coverage\" \"npm run test:funds-history:coverage\" \"npm run test:product-team:coverage\" \"npm run test:sponsor-team:coverage\" \"npm run test:user-account:coverage\"",
+    "test:wallet:coverage": "cd \"my wallet/wallet-microservice\" && npm run test:cov",
+    "test:credit-debit:coverage": "cd \"my wallet/credit-debit-microservice\" && npm run test:cov",
+    "test:funds-transfer:coverage": "cd \"my wallet/funds-transfer-microservice\" && npm run test:cov",
+    "test:funds-received:coverage": "cd \"my wallet/funds-received-microservice\" && npm run test:cov",
+    "test:funds-history:coverage": "cd \"my wallet/funds-transfer-history-microservice\" && npm run test:cov",
+    "test:product-team:coverage": "cd product-team-microservice && npm run test:cov",
+    "test:sponsor-team:coverage": "cd sponsor-team-microservice && npm run test:cov",
+    "test:user-account:coverage": "cd user-account-microservice && npm run test:cov",
+    "dev": "npm run start",
+    "start:dev": "npm run start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+} 

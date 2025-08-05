@@ -18,6 +18,10 @@ export interface AppConfig {
       url: string;
       timeout: number;
     };
+    wallet: {
+      url: string;
+      timeout: number;
+    };
   };
   
   // API Configuration
@@ -57,6 +61,10 @@ export const appConfig: AppConfig = {
     balance: {
       url: process.env.BALANCE_SERVICE_URL || 'http://localhost:3004',
       timeout: parseInt(process.env.BALANCE_TIMEOUT || '5000'),
+    },
+    wallet: {
+      url: process.env.WALLET_SERVICE_URL || 'http://localhost:3000',
+      timeout: parseInt(process.env.WALLET_TIMEOUT || '5000'),
     },
   },
   

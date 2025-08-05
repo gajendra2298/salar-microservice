@@ -4,6 +4,7 @@ export declare class Funds {
     userId: Types.ObjectId;
     receiverUserId: Types.ObjectId;
     type: string;
+    commissionType: string;
     amount: number;
     transactionNo: string;
     status: string;

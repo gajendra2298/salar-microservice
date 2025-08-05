@@ -1,19 +1,22 @@
-import { Controller, Post, Body, UseGuards, Request, Get } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from '../services/user.service';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { GetOtpDto, ChangeTransactionPasswordDto } from '../dto/change-transaction-password.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
-@ApiTags('User Management')
+@ApiTags('User Password Management')
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Change user password' })
+  @ApiOperation({ 
+    summary: 'Change user password',
+    description: 'Change user password with old password, new password, confirm password, and transaction password validation'
+  })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 400, description: 'Bad request - passwords do not match or invalid format' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
@@ -24,9 +27,9 @@ export class UserController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ 
     summary: 'Request OTP for transaction password change',
-    description: 'Sends a 6-digit numeric OTP to both email and SMS (SMS only for Indian users). The OTP is valid for a limited time and can only be used once.'
+    description: 'Sends a 6-digit numeric OTP to both email and SMS (SMS only for Indian users). Email and mobile are auto-filled from signup.'
   })
-  @ApiResponse({ status: 200, description: 'OTP sent successfully to email and/or SMS' })
+  @ApiResponse({ status: 200, description: 'OTP sent successfully to email and SMS' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
@@ -39,24 +42,14 @@ export class UserController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ 
     summary: 'Change transaction password with OTP',
-    description: 'Verify the 6-digit numeric OTP received via email/SMS and set new transaction password'
+    description: 'Verify the 6-digit numeric OTP received via email/SMS and set new transaction password with confirmation'
   })
   @ApiResponse({ status: 200, description: 'Transaction password changed successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request or invalid OTP' })
+  @ApiResponse({ status: 400, description: 'Bad request, invalid OTP, or passwords do not match' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('change-transaction-password')
   async changeTransactionPassword(@Request() req, @Body() changeTransactionPasswordDto: ChangeTransactionPasswordDto) {
     return this.userService.changeTransactionPassword(req.user.userId, changeTransactionPasswordDto);
-  }
-
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Get user profile' })
-  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @UseGuards(JwtAuthGuard)
-  @Get('profile')
-  async getUserProfile(@Request() req) {
-    return this.userService.getUserProfile(req.user.userId);
   }
 } 

@@ -18,6 +18,10 @@ exports.appConfig = {
             url: process.env.BALANCE_SERVICE_URL || 'http://localhost:3004',
             timeout: parseInt(process.env.BALANCE_TIMEOUT || '5000'),
         },
+        wallet: {
+            url: process.env.WALLET_SERVICE_URL || 'http://localhost:3000',
+            timeout: parseInt(process.env.WALLET_TIMEOUT || '5000'),
+        },
     },
     api: {
         token: process.env.API_TOKEN || '',

@@ -25,7 +25,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
   
-  const port = process.env.PORT || 3002;
+  const port = process.env.PORT || 3007;
   await app.listen(port);
   console.log(`Sponsor Team Microservice is running on port ${port}`);
   console.log(`Swagger UI is available at http://localhost:${port}/api`);

@@ -16,9 +16,38 @@ let Funds = class Funds {
 };
 exports.Funds = Funds;
 __decorate([
+    (0, mongoose_1.Prop)({ type: Number, required: true, auto: true }),
+    __metadata("design:type", Number)
+], Funds.prototype, "serialNo", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Date, required: true, default: Date.now }),
+    __metadata("design:type", Date)
+], Funds.prototype, "transferDate", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, required: true }),
+    __metadata("design:type", String)
+], Funds.prototype, "receiverCustomerRegisteredId", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, required: true }),
+    __metadata("design:type", String)
+], Funds.prototype, "customerName", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, required: true, unique: true }),
+    __metadata("design:type", String)
+], Funds.prototype, "fundsTransactionNo", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({
+        type: String,
+        enum: ['Success', 'Failed'],
+        required: true,
+        default: 'Success'
+    }),
+    __metadata("design:type", String)
+], Funds.prototype, "status", void 0);
+__decorate([
     (0, mongoose_1.Prop)({ type: mongoose_2.Types.ObjectId, ref: 'users', required: true }),
     __metadata("design:type", mongoose_2.Types.ObjectId)
-], Funds.prototype, "userId", void 0);
+], Funds.prototype, "senderUserId", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: mongoose_2.Types.ObjectId, ref: 'users', required: true }),
     __metadata("design:type", mongoose_2.Types.ObjectId)
@@ -38,25 +67,32 @@ __decorate([
         required: true
     }),
     __metadata("design:type", String)
-], Funds.prototype, "type", void 0);
+], Funds.prototype, "commissionType", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: Number, required: true }),
     __metadata("design:type", Number)
 ], Funds.prototype, "amount", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ type: String, required: true }),
-    __metadata("design:type", String)
-], Funds.prototype, "transactionNo", void 0);
+    (0, mongoose_1.Prop)({ type: Number, default: 0 }),
+    __metadata("design:type", Number)
+], Funds.prototype, "adminCharges", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({
-        type: String,
-        enum: ['Pending', 'Failed', 'Success'],
-        default: 'Pending'
-    }),
+    (0, mongoose_1.Prop)({ type: Number, default: 0 }),
+    __metadata("design:type", Number)
+], Funds.prototype, "netPayable", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String }),
     __metadata("design:type", String)
-], Funds.prototype, "status", void 0);
+], Funds.prototype, "failureReason", void 0);
 exports.Funds = Funds = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], Funds);
 exports.FundsSchema = mongoose_1.SchemaFactory.createForClass(Funds);
+exports.FundsSchema.pre('save', async function (next) {
+    if (this.isNew) {
+        const lastRecord = await this.constructor.findOne({}, {}, { sort: { 'serialNo': -1 } });
+        this.serialNo = lastRecord ? lastRecord.serialNo + 1 : 1;
+    }
+    next();
+});
 //# sourceMappingURL=funds.schema.js.map

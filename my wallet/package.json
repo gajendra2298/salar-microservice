@@ -1,0 +1,21 @@
+{
+  "name": "wallet-system",
+  "version": "1.0.0",
+  "description": "Wallet System - All Microservices",
+  "scripts": {
+    "start": "concurrently \"npm run start:wallet\" \"npm run start:credit-debit\" \"npm run start:funds-transfer\" \"npm run start:funds-received\" \"npm run start:funds-history\" \"npm run start:product-team\" \"npm run start:sponsor-team\" \"npm run start:user-account\"",
+    "start:wallet": "cd wallet-microservice && npm run start:dev",
+    "start:credit-debit": "cd credit-debit-microservice && npm run start:dev",
+    "start:funds-transfer": "cd funds-transfer-microservice && npm run start:dev",
+    "start:funds-received": "cd funds-received-microservice && npm run start:dev",
+    "start:funds-history": "cd funds-transfer-history-microservice && npm run start:dev",
+    "start:product-team": "cd ../product-team-microservice && npm run start:dev",
+    "start:sponsor-team": "cd ../sponsor-team-microservice && npm run start:dev",
+    "start:user-account": "cd ../user-account-microservice && npm run start:dev",
+    "install:all": "npm install && cd wallet-microservice && npm install && cd ../credit-debit-microservice && npm install && cd ../funds-transfer-microservice && npm install && cd ../funds-received-microservice && npm install && cd ../funds-transfer-history-microservice && npm install && cd ../../product-team-microservice && npm install && cd ../sponsor-team-microservice && npm install && cd ../user-account-microservice && npm install",
+    "build:all": "cd wallet-microservice && npm run build && cd ../credit-debit-microservice && npm run build && cd ../funds-transfer-microservice && npm run build && cd ../funds-received-microservice && npm run build && cd ../funds-transfer-history-microservice && npm run build && cd ../../product-team-microservice && npm run build && cd ../sponsor-team-microservice && npm run build && cd ../user-account-microservice && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+} 

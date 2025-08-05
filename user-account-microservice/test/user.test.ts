@@ -75,6 +75,7 @@ describe('UserService', () => {
       const changePasswordDto = {
         oldPassword: 'OldPass123!',
         newPassword: 'NewPass123!',
+        confirmPassword: 'NewPass123!',
         transactionPassword: 'TransPass123!',
       };
 
@@ -113,6 +114,29 @@ describe('UserService', () => {
       const result = await service.changeTransactionPasswordRequest('userId', getOtpDto);
       
       expect(result.message).toBe('OTP sent successfully');
+      expect(result.status).toBe(1);
+    });
+  });
+
+  describe('changeTransactionPassword', () => {
+    it('should change transaction password successfully', async () => {
+      const mockUser = {
+        _id: 'userId',
+        otp: '123456',
+      };
+
+      mockUserModel.findOne.mockResolvedValue(mockUser);
+      mockUserModel.findByIdAndUpdate.mockResolvedValue(mockUser);
+
+      const changeTransactionPasswordDto = {
+        otp: '123456',
+        newTransactionPassword: 'NewTransPass123!',
+        confirmTransactionPassword: 'NewTransPass123!',
+      };
+
+      const result = await service.changeTransactionPassword('userId', changeTransactionPasswordDto);
+      
+      expect(result.message).toBe('Transaction password updated successfully');
       expect(result.status).toBe(1);
     });
   });

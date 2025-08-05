@@ -21,86 +21,83 @@ let FundsTransferHistoryService = class FundsTransferHistoryService {
     constructor(fundsModel) {
         this.fundsModel = fundsModel;
     }
-    async fundsTransferHistoryListing(data) {
+    async saveTransferHistory(transferData) {
         try {
-            const { userId, page, pagesize, startDate, endDate, searchText, sort } = data;
-            const skip = (parseInt(page.toString()) - 1) * parseInt(pagesize.toString());
-            const sortOption = sort || { _id: -1 };
-            const limit = pagesize;
-            const matchConditions = { userId };
-            if (startDate || endDate) {
-                const dateFilter = {};
-                if (startDate) {
-                    dateFilter.$gte = new Date(startDate);
-                }
-                if (endDate) {
-                    dateFilter.$lte = new Date(endDate);
-                }
-                matchConditions.createdAt = dateFilter;
-            }
-            if (searchText) {
-                const searchRegex = { $regex: `.*${searchText}.*`, $options: 'i' };
-                matchConditions.$or = [
-                    { type: searchRegex },
-                    { transactionNo: searchRegex },
-                ];
-            }
-            const pipeline = [
-                { $match: matchConditions },
-                {
-                    $lookup: {
-                        from: 'users',
-                        localField: 'receiverUserId',
-                        foreignField: '_id',
-                        as: 'receiver',
-                    },
-                },
-                { $unwind: { path: '$receiver', preserveNullAndEmptyArrays: true } },
-                {
-                    $project: {
-                        createdAt: 1,
-                        transactionNo: 1,
-                        commissionName: '$type',
-                        amount: 1,
-                        'receiver._id': 1,
-                        'receiver.fullName': 1,
-                        'receiver.registerId': 1,
-                        status: 1,
-                    },
-                },
-                { $sort: sortOption },
-                { $skip: skip },
-                { $limit: limit },
-            ];
-            const result = await this.fundsModel.aggregate(pipeline);
-            const totalPipeline = [
-                { $match: matchConditions },
-                {
-                    $lookup: {
-                        from: 'users',
-                        localField: 'receiverUserId',
-                        foreignField: '_id',
-                        as: 'receiver',
-                    },
-                },
-                { $unwind: { path: '$receiver', preserveNullAndEmptyArrays: true } },
-                { $project: { _id: 1 } },
-            ];
-            const total = await this.fundsModel.aggregate(totalPipeline);
+            const newTransferHistory = new this.fundsModel({
+                senderUserId: transferData.senderUserId,
+                receiverUserId: transferData.receiverUserId,
+                receiverCustomerRegisteredId: transferData.receiverCustomerRegisteredId,
+                customerName: transferData.customerName,
+                commissionType: transferData.commissionType,
+                amount: transferData.amount,
+                adminCharges: transferData.adminCharges,
+                netPayable: transferData.netPayable,
+                fundsTransactionNo: transferData.fundsTransactionNo,
+                status: transferData.status,
+                failureReason: transferData.failureReason,
+                transferDate: new Date()
+            });
+            const savedHistory = await newTransferHistory.save();
             return {
-                status: 1,
-                data: result,
-                page,
-                pagesize,
-                total: total.length,
+                success: true,
+                message: 'Transfer history saved successfully',
+                data: {
+                    serialNo: savedHistory.serialNo,
+                    transferDate: savedHistory.transferDate,
+                    receiverCustomerRegisteredId: savedHistory.receiverCustomerRegisteredId,
+                    customerName: savedHistory.customerName,
+                    fundsTransactionNo: savedHistory.fundsTransactionNo,
+                    status: savedHistory.status
+                }
             };
         }
         catch (error) {
-            console.error('Error in funds transfer history listing:', error);
+            throw new common_1.HttpException('Error saving transfer history', common_1.HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    async getTransferHistory(userId, page = 1, limit = 10) {
+        try {
+            const skip = (page - 1) * limit;
+            let query = {};
+            if (userId) {
+                query = {
+                    $or: [
+                        { senderUserId: userId },
+                        { receiverUserId: userId }
+                    ]
+                };
+            }
+            const transferHistory = await this.fundsModel
+                .find(query)
+                .sort({ transferDate: -1, serialNo: -1 })
+                .skip(skip)
+                .limit(limit)
+                .select('serialNo transferDate receiverCustomerRegisteredId customerName fundsTransactionNo status');
+            const totalCount = await this.fundsModel.countDocuments(query);
+            const formattedHistory = transferHistory.map(record => ({
+                serialNo: record.serialNo,
+                date: record.transferDate.toLocaleDateString(),
+                receiverCustomerRegisteredId: record.receiverCustomerRegisteredId,
+                customerName: record.customerName,
+                fundsTransactionNo: record.fundsTransactionNo,
+                status: record.status
+            }));
             return {
-                status: 0,
-                message: 'Internal server error',
+                success: true,
+                message: 'Transfer history retrieved successfully',
+                data: {
+                    history: formattedHistory,
+                    pagination: {
+                        currentPage: page,
+                        totalPages: Math.ceil(totalCount / limit),
+                        totalRecords: totalCount,
+                        recordsPerPage: limit
+                    }
+                }
             };
+        }
+        catch (error) {
+            throw new common_1.HttpException('Error retrieving transfer history', common_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 };

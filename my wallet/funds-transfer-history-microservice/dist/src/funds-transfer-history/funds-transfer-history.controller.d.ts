@@ -1,24 +1,7 @@
-import { FundsTransferHistoryService } from './funds-transfer-history.service';
-declare class FundsTransferHistoryDto {
-    userId: string;
-    page: number;
-    pagesize: number;
-    startDate?: string;
-    endDate?: string;
-    searchText?: string;
-    sort?: any;
-}
-declare class FundsTransferHistoryResponseDto {
-    status: number;
-    data?: any[];
-    page?: number;
-    pagesize?: number;
-    total?: number;
-    message?: string;
-}
+import { FundsTransferHistoryService, TransferHistoryData } from './funds-transfer-history.service';
 export declare class FundsTransferHistoryController {
     private readonly fundsTransferHistoryService;
     constructor(fundsTransferHistoryService: FundsTransferHistoryService);
-    fundsTransferHistoryListing(data: FundsTransferHistoryDto): Promise<FundsTransferHistoryResponseDto>;
+    saveTransferHistory(transferData: TransferHistoryData): Promise<any>;
+    getTransferHistory(userId?: string, page?: number, limit?: number): Promise<any>;
 }
-export {};

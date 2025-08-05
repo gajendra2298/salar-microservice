@@ -1,134 +1,199 @@
 # Funds Transfer Microservice
 
-A NestJS microservice for handling fund transfers between users with external service integration using axios.
-
-## Features
-
-- ✅ Swagger UI API Documentation
-- ✅ MongoDB Integration with Mongoose
-- ✅ External Service Integration using Axios
-- ✅ Comprehensive Error Handling
-- ✅ Transaction Password Validation
-- ✅ Balance Validation
-- ✅ User Validation
+A NestJS microservice for handling funds transfers between users with commission validation and admin charges calculation. Features a single comprehensive endpoint that automatically provides commission dropdown data and processes transfers.
 
 ## API Endpoints
 
-### 1. GET /funds-transfer/dropdown-values/:userId
-Fetches user details from external user service for dropdown values.
+### POST /funds-transfer/transfer-funds
 
-**Parameters:**
-- `userId` (string): User ID to fetch details for
+Single comprehensive endpoint for funds transfer. This endpoint automatically provides all available commission types for dropdown selection and processes the transfer. Supports both JSON and form data requests.
 
-**Responses:**
-- `200`: User details retrieved successfully
-- `401`: Unauthorized access to user service
-- `404`: User not found
-- `503`: User service unavailable
-- `408`: Request timeout
+**Two Usage Modes:**
 
-### 2. POST /funds-transfer/transfer
-Transfers funds between accounts with comprehensive validation.
+#### 1. **Get Commission Types (Empty POST)**
+Send an empty POST request to get all available commission types for dropdown:
 
-**Request Body:**
+```bash
+curl -X POST http://localhost:3000/funds-transfer/transfer-funds \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+**Response:**
 ```json
 {
-  "userId": "string",
-  "registerId": "string", 
-  "amount": "number",
-  "type": "string",
-  "transactionPassword": "string"
+  "success": true,
+  "message": "Commission types and form data retrieved successfully",
+  "data": {
+    "commissionTypes": [
+      {
+        "value": "Referral Comm",
+        "label": "Referral Commission",
+        "description": "Transfer from Referral Commission"
+      },
+      {
+        "value": "Sponsor Comm",
+        "label": "Sponsor Commission",
+        "description": "Transfer from Sponsor Commission"
+      },
+      {
+        "value": "AuS Comm",
+        "label": "AuS Commission",
+        "description": "Transfer from AuS Commission"
+      },
+      {
+        "value": "Product Team Referral Commission",
+        "label": "Product Team Referral Commission",
+        "description": "Transfer from Product Team Referral Commission"
+      },
+      {
+        "value": "Nova Referral Commission",
+        "label": "Nova Referral Commission",
+        "description": "Transfer from Nova Referral Commission"
+      },
+      {
+        "value": "Royalty Referral Team Commission",
+        "label": "Royalty Referral Team Commission",
+        "description": "Transfer from Royalty Referral Team Commission"
+      }
+    ],
+    "formFields": {
+      "customerRegisteredId": "",
+      "commissionType": "",
+      "amount": 0,
+      "transactionPassword": ""
+    }
+  }
 }
 ```
 
-**Responses:**
-- `201`: Funds transferred successfully
-- `400`: Bad request (invalid data, insufficient balance, same user)
-- `401`: Invalid transaction password
-- `404`: Receiver user not found
-- `503`: External services unavailable
-- `500`: Internal server error
+#### 2. **Process Transfer (With Data)**
+Send transfer data to process the actual transfer:
 
-## External Services Integration
+**Available Commission Types:**
+- `Referral Comm` - Referral Commission
+- `Sponsor Comm` - Sponsor Commission  
+- `AuS Comm` - AuS Commission
+- `Product Team Referral Commission` - Product Team Referral Commission
+- `Nova Referral Commission` - Nova Referral Commission
+- `Royalty Referral Team Commission` - Royalty Referral Team Commission
 
-The microservice integrates with the following external services:
-
-### 1. User Service (Port 3001)
-- **GET** `/api/users/{userId}/details` - Fetch user details
-- **GET** `/api/users/{userId}` - Validate user exists
-
-### 2. Authentication Service (Port 3003)
-- **POST** `/api/auth/validate-password` - Validate transaction password
-
-### 3. Balance Service (Port 3004)
-- **GET** `/api/balance/{userId}/{type}` - Fetch user balance
-- **POST** `/api/balance/transfer` - Update balances after transfer
-
-## Environment Variables
-
-Create a `.env` file with the following variables:
-
-```env
-# MongoDB Configuration
-MONGODB_URI=mongodb://localhost:27017/funds-transfer
-
-# External Service URLs
-USER_SERVICE_URL=http://localhost:3001
-AUTH_SERVICE_URL=http://localhost:3003
-BALANCE_SERVICE_URL=http://localhost:3004
-
-# API Authentication
-API_TOKEN=your-api-token-here
-
-# Application Configuration
-PORT=3002
-NODE_ENV=development
+**Request Body (JSON):**
+```json
+{
+  "customerRegisteredId": "CUST123456",
+  "commissionType": "Referral Comm",
+  "amount": 1000.00,
+  "transactionPassword": "password123"
+}
 ```
 
-## Installation & Running
+**Request Body (Form Data):**
+```
+customerRegisteredId: CUST123456
+commissionType: Referral Comm
+amount: 1000.00
+transactionPassword: password123
+```
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+**Process Steps:**
+1. **Customer Validation** - Validates the recipient's Customer Registered ID and displays customer name
+2. **Commission Selection** - User selects from available commission types dropdown
+3. **Balance Validation** - System checks if selected commission has sufficient balance
+4. **Admin Charges Calculation** - Calculates 5% admin charges on transfer amount
+5. **Net Payable Calculation** - Shows final transfer amount after deducting admin charges
+6. **Transaction Password Verification** - Validates user's transaction password
+7. **Transfer Processing** - Executes the transfer and updates both sender and receiver wallets
 
-2. **Start MongoDB:**
-   ```bash
-   # Make sure MongoDB is running on localhost:27017
-   ```
+**Success Response (201):**
+```json
+{
+  "success": true,
+  "message": "Funds transferred successfully",
+  "data": {
+    "transactionNo": "TXN20241201001",
+    "senderId": "507f1f77bcf86cd799439011",
+    "receiverId": "CUST123456",
+    "commissionType": "Referral Comm",
+    "amount": 1000.00,
+    "adminCharges": 50.00,
+    "netPayable": 950.00,
+    "status": "Success",
+    "createdAt": "2024-12-01T10:30:00.000Z"
+  }
+}
+```
 
-3. **Start the application:**
-   ```bash
-   npm run start:dev
-   ```
+**Error Responses:**
+- `400 Bad Request` - Validation error or insufficient commission balance
+- `401 Unauthorized` - Invalid transaction password
+- `404 Not Found` - Customer not found
+- `500 Internal Server Error` - Server error during transfer
 
-4. **Access Swagger UI:**
-   ```
-   http://localhost:3002/api
-   ```
+**Validation Rules:**
+- `customerRegisteredId` - Required string, must be a valid customer ID
+- `commissionType` - Required enum, must be one of the available commission types
+- `amount` - Required number, minimum 0.01, must not exceed available commission balance
+- `transactionPassword` - Required string, minimum 6 characters, maximum 50 characters
 
-## Error Handling
+**Example Usage:**
 
-The service includes comprehensive error handling for:
+**Get Commission Types (for dropdown):**
+```bash
+curl -X POST http://localhost:3000/funds-transfer/transfer-funds \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
 
-- **Network Errors**: Connection refused, timeouts
-- **HTTP Status Errors**: 401, 404, 503, etc.
-- **Validation Errors**: Missing fields, invalid data
-- **Business Logic Errors**: Insufficient balance, same user transfer
+**JSON Transfer Request:**
+```bash
+curl -X POST http://localhost:3000/funds-transfer/transfer-funds \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerRegisteredId": "CUST123456",
+    "commissionType": "Referral Comm",
+    "amount": 1000.00,
+    "transactionPassword": "password123"
+  }'
+```
 
-## API Documentation
+**Form Data Transfer Request:**
+```bash
+curl -X POST http://localhost:3000/funds-transfer/transfer-funds \
+  -F "customerRegisteredId=CUST123456" \
+  -F "commissionType=Referral Comm" \
+  -F "amount=1000.00" \
+  -F "transactionPassword=password123"
+```
 
-Swagger UI provides interactive documentation at `/api` endpoint with:
-- Detailed request/response schemas
-- Example requests
-- Response codes and descriptions
-- Try-it-out functionality
+## Features
+
+- **Single Endpoint** - One comprehensive endpoint for both dropdown data and transfers
+- **Auto Dropdown Data** - Automatically provides all commission types for frontend dropdowns
+- **Form Data Support** - Accepts both JSON and multipart/form-data requests
+- **Form Validation** - Comprehensive validation of all input fields
+- **Commission Balance Check** - Validates sufficient balance before transfer
+- **Admin Charges** - Automatically calculates 5% admin charges
+- **Transaction Password Security** - Validates user's transaction password
+- **Real-time Balance Updates** - Updates both sender and receiver wallets
+- **Transaction Tracking** - Generates unique transaction numbers and records
+- **Error Handling** - Comprehensive error handling with meaningful messages
+- **Swagger Documentation** - Complete API documentation with examples
 
 ## Dependencies
 
-- `@nestjs/common`: NestJS core
-- `@nestjs/mongoose`: MongoDB integration
-- `@nestjs/swagger`: API documentation
-- `axios`: HTTP client for external services
-- `mongoose`: MongoDB ODM
-- `swagger-ui-express`: Swagger UI 
+- `@nestjs/common` - NestJS core functionality
+- `@nestjs/mongoose` - MongoDB integration
+- `@nestjs/swagger` - API documentation
+- `@nestjs/platform-express` - File upload and form data support
+- `class-validator` - Input validation
+- `class-transformer` - Data transformation
+- `axios` - HTTP client for external service calls
+- `mongoose` - MongoDB ODM
+
+## Environment Variables
+
+- `USER_SERVICE_URL` - URL for user service (default: http://localhost:3001)
+- `USER_TIMEOUT` - Timeout for user service calls (default: 5000ms)
+- `WALLET_SERVICE_URL` - URL for wallet service (default: http://localhost:3000)
+- `WALLET_TIMEOUT` - Timeout for wallet service calls (default: 5000ms) 
