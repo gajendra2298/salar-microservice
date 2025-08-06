@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const testing_1 = require("@nestjs/testing");
 const config_1 = require("@nestjs/config");
@@ -6,7 +9,7 @@ const mongoose_1 = require("@nestjs/mongoose");
 const credit_debit_schema_1 = require("../src/credit-debit/schemas/credit-debit.schema");
 const credit_debit_service_1 = require("../src/credit-debit/credit-debit.service");
 const credit_debit_controller_1 = require("../src/credit-debit/credit-debit.controller");
-const request = require("supertest");
+const supertest_1 = __importDefault(require("supertest"));
 const mongoose_2 = require("mongoose");
 describe('Credit Debit Microservice Integration Tests', () => {
     let app;
@@ -333,7 +336,7 @@ describe('Credit Debit Microservice Integration Tests', () => {
                 page: 1,
                 pagesize: 10
             };
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .post('/credit-debit/listing')
                 .send(listingData)
                 .expect(201);
@@ -350,7 +353,7 @@ describe('Credit Debit Microservice Integration Tests', () => {
                 page: 2,
                 pagesize: 5
             };
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .post('/credit-debit/listing')
                 .send(listingData)
                 .expect(201);
@@ -367,7 +370,7 @@ describe('Credit Debit Microservice Integration Tests', () => {
                 startDate: '2024-01-01',
                 endDate: '2024-12-31'
             };
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .post('/credit-debit/listing')
                 .send(listingData)
                 .expect(201);
@@ -382,7 +385,7 @@ describe('Credit Debit Microservice Integration Tests', () => {
                 pagesize: 10,
                 searchText: 'Funds'
             };
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .post('/credit-debit/listing')
                 .send(listingData)
                 .expect(201);
@@ -399,7 +402,7 @@ describe('Credit Debit Microservice Integration Tests', () => {
                 type: 'Funds',
                 amount: 200
             };
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .post('/credit-debit/create')
                 .send(creditData)
                 .expect(201);
@@ -420,7 +423,7 @@ describe('Credit Debit Microservice Integration Tests', () => {
                 type: 'Funds',
                 amount: 75
             };
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .post('/credit-debit/create')
                 .send(debitData)
                 .expect(201);

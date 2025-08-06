@@ -1,16 +1,10 @@
 import { CreditDebitService } from './credit-debit.service';
+import { CreditDebitListingDto } from './dto/credit-debit-listing.dto';
+import { CreateCreditDebitDto } from './dto/create-credit-debit.dto';
 export declare class CreditDebitController {
     private readonly creditDebitService;
     constructor(creditDebitService: CreditDebitService);
-    creditDebitListing(data: {
-        userId: string;
-        page: number;
-        pagesize: number;
-        startDate?: string;
-        endDate?: string;
-        searchText?: string;
-        sort?: any;
-    }): Promise<{
+    creditDebitListing(data: CreditDebitListingDto): Promise<{
         status: number;
         data: any[];
         page: number;
@@ -25,14 +19,7 @@ export declare class CreditDebitController {
         pagesize?: undefined;
         total?: undefined;
     }>;
-    createCreditDebit(creditDebitData: {
-        userId: string;
-        reason: string;
-        orderId?: string;
-        status: 'Credited' | 'Debited';
-        type: string;
-        amount: number;
-    }): Promise<{
+    createCreditDebit(creditDebitData: CreateCreditDebitDto): Promise<{
         status: number;
         message: string;
         data: import("mongoose").Document<unknown, {}, import("./schemas/credit-debit.schema").CreditDebitDocument> & import("./schemas/credit-debit.schema").CreditDebit & import("mongoose").Document<any, any, any> & {

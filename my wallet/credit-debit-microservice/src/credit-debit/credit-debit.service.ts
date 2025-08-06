@@ -1,13 +1,37 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreditDebit, CreditDebitDocument } from './schemas/credit-debit.schema';
+import * as mockUserData from './mock-data/user-details.mock.json';
+import * as _ from 'lodash';
 
 @Injectable()
 export class CreditDebitService {
+  private mockUsers = mockUserData.users;
+
   constructor(
     @InjectModel(CreditDebit.name) private creditDebitModel: Model<CreditDebitDocument>,
   ) {}
+
+  /**
+   * Find user from mock data - try multiple ways to find the user
+   */
+  private findUserFromMockData(userId: string) {
+    // Try to find by registerId first
+    let user = this.mockUsers.find(u => u.registerId === userId);
+    
+    if (_.isEmpty(user)) {
+      // Try to find by _id if userId is a MongoDB ObjectId
+      user = this.mockUsers.find(u => u._id === userId);
+    }
+    
+    if (_.isEmpty(user)) {
+      // Try to find by emailId
+      user = this.mockUsers.find(u => u.emailId === userId);
+    }
+    
+    return user;
+  }
 
   async creditDebitListing(data: {
     userId: string;
@@ -20,12 +44,19 @@ export class CreditDebitService {
   }) {
     try {
       const { userId, page, pagesize, startDate, endDate, searchText, sort } = data;
+      
+      // Find user from mock data
+      const user = this.findUserFromMockData(userId);
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
       const skip = (parseInt(page.toString()) - 1) * parseInt(pagesize.toString());
       const sortOption = sort || { _id: -1 };
       const limit = pagesize;
 
-      // Build query conditions
-      const matchConditions: any = { userId };
+      // Build query conditions using user._id from mock data
+      const matchConditions: any = { userId: new Types.ObjectId(user._id) };
 
       // Date filter
       if (startDate || endDate) {
@@ -105,6 +136,12 @@ export class CreditDebitService {
     amount: number;
   }) {
     try {
+      // Find user from mock data
+      const user = this.findUserFromMockData(creditDebitData.userId);
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
       // Generate transaction number
       const creditDebitCount = await this.creditDebitModel.countDocuments();
       const randomGenerator = this.generateRandomString(8);
@@ -112,6 +149,7 @@ export class CreditDebitService {
 
       const newCreditDebit = await this.creditDebitModel.create({
         ...creditDebitData,
+        userId: new Types.ObjectId(user._id),
         transactionNo,
       });
 

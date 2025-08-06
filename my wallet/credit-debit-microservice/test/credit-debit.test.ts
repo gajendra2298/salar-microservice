@@ -5,7 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { CreditDebitSchema } from '../src/credit-debit/schemas/credit-debit.schema';
 import { CreditDebitService } from '../src/credit-debit/credit-debit.service';
 import { CreditDebitController } from '../src/credit-debit/credit-debit.controller';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Types } from 'mongoose';
 
 describe('Credit Debit Microservice Integration Tests', () => {

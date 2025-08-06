@@ -1,8 +1,10 @@
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreditDebit, CreditDebitDocument } from './schemas/credit-debit.schema';
 export declare class CreditDebitService {
     private creditDebitModel;
+    private mockUsers;
     constructor(creditDebitModel: Model<CreditDebitDocument>);
+    private findUserFromMockData;
     creditDebitListing(data: {
         userId: string;
         page: number;
@@ -37,7 +39,7 @@ export declare class CreditDebitService {
         status: number;
         message: string;
         data: import("mongoose").Document<unknown, {}, CreditDebitDocument> & CreditDebit & import("mongoose").Document<any, any, any> & {
-            _id: import("mongoose").Types.ObjectId;
+            _id: Types.ObjectId;
         };
     } | {
         status: number;
