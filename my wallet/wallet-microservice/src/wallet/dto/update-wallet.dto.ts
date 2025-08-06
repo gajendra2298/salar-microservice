@@ -1,14 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsOptional, IsMongoId } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsNotEmpty } from 'class-validator';
 
 export class UpdateWalletDto {
   @ApiProperty({
-    description: 'User ID (MongoDB ObjectId)',
-    example: '507f1f77bcf86cd799439011',
+    description: 'User ID (can be registerId, emailId, or MongoDB ObjectId)',
+    example: 'REG123456789',
     required: true
   })
   @IsString()
-  @IsMongoId()
+  @IsNotEmpty()
   userId: string;
 
   @ApiProperty({

@@ -36,6 +36,7 @@ describe('ProductTeamController', () => {
   describe('getPendingTeamMembers', () => {
     it('should get pending team members successfully', async () => {
       const mockData = {
+        userId: 'REG123456789',
         searchText: 'test',
       };
 
@@ -55,13 +56,17 @@ describe('ProductTeamController', () => {
 
       jest.spyOn(service, 'getPendingTeamMembers').mockResolvedValue(mockResult);
 
-      const result = await controller.getPendingTeamMembers(mockData, { user: { id: 'test-user-id' } });
+      const result = await controller.getPendingTeamMembers(mockData, { body: { userId: 'REG123456789' } });
       expect(result).toEqual(mockResult);
     });
   });
 
   describe('getTeamTreeDetails', () => {
     it('should get team tree details successfully', async () => {
+      const mockData = {
+        userId: 'REG123456789',
+      };
+
       const mockResult = {
         status: 1,
         data: [
@@ -78,7 +83,7 @@ describe('ProductTeamController', () => {
 
       jest.spyOn(service, 'getTeamTreeDetails').mockResolvedValue(mockResult);
 
-      const result = await controller.getTeamTreeDetails({ user: { id: 'test-user-id' } });
+      const result = await controller.getTeamTreeDetails(mockData);
       expect(result).toEqual(mockResult);
     });
   });
@@ -97,7 +102,7 @@ describe('ProductTeamController', () => {
 
       jest.spyOn(service, 'addTeamMember').mockResolvedValue(mockResult);
 
-      const result = await controller.addTeamMember(mockData, { user: { id: 'test-user-id' } });
+      const result = await controller.addTeamMember(mockData, { body: { userId: '507f1f77bcf86cd799439011' } });
       expect(result).toEqual(mockResult);
     });
   });

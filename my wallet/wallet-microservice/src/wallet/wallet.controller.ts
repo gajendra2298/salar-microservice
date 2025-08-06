@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/s
 import { WalletService } from './wallet.service';
 import { UpdateWalletDto } from './dto/update-wallet.dto';
 import { WalletResponseDto } from './dto/wallet-response.dto';
+import { GetWalletBalanceDto } from './dto/get-wallet-balance.dto';
 import { Types } from 'mongoose';
 
 @ApiTags('wallet')
@@ -10,9 +11,9 @@ import { Types } from 'mongoose';
 export class WalletController {
   constructor(private readonly walletService: WalletService) {}
 
-  @Get('balance/:userId')
+  @Post('balance')
   @ApiOperation({ summary: 'Get wallet balance for a user' })
-  @ApiParam({ name: 'userId', description: 'User ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439011' })
+  @ApiBody({ type: GetWalletBalanceDto })
   @ApiResponse({ 
     status: 200, 
     description: 'Wallet balance retrieved successfully',
@@ -20,13 +21,13 @@ export class WalletController {
   })
   @ApiResponse({ status: 400, description: 'Invalid user ID' })
   @ApiResponse({ status: 404, description: 'Wallet not found' })
-  async getWalletBalance(@Param('userId') userId: string): Promise<WalletResponseDto> {
+  async getWalletBalance(@Body() data: GetWalletBalanceDto): Promise<WalletResponseDto> {
     // Validate userId
-    if (!userId || !Types.ObjectId.isValid(userId)) {
-      throw new BadRequestException('Invalid user ID');
+    if (!data.userId) {
+      throw new BadRequestException('userId is required');
     }
 
-    const result = await this.walletService.getWalletBalance(userId);
+    const result = await this.walletService.getWalletBalance(data.userId);
     
     if (result.status === 0) {
       throw new HttpException(result.message, HttpStatus.BAD_REQUEST);
@@ -49,10 +50,6 @@ export class WalletController {
     // Validate required fields
     if (!updateWalletDto.userId) {
       throw new BadRequestException('userId is required');
-    }
-
-    if (!Types.ObjectId.isValid(updateWalletDto.userId)) {
-      throw new BadRequestException('Invalid user ID');
     }
 
     // Remove userId from updates object

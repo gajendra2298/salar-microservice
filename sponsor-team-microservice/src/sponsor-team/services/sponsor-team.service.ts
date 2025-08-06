@@ -4,7 +4,7 @@ import { Model } from 'mongoose';
 import { SponsorTeam, SponsorTeamDocument } from '../schemas/sponsor-team.schema';
 import { AddSponsorTeamDto } from '../dto/add-sponsor-team.dto';
 import { GetSponsorTeamDto } from '../dto/get-sponsor-team.dto';
-import * as moment from 'moment';
+import moment from 'moment';
 
 @Injectable()
 export class SponsorTeamService {
@@ -59,7 +59,7 @@ export class SponsorTeamService {
           dateFilter.$gte = moment(data.filter.startDate, 'YYYY-MM-DD').startOf('day').toDate();
         }
         if (data.filter.endDate) {
-          dateFilter.$lte = moment(data.filter.endDate, 'YYYY-MM-DD').endOf('day').toDate();
+          dateFilter.$lte = new Date(moment(data.filter.endDate).endOf('day').format());
         }
         query = {
           ...query,

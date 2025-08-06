@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
@@ -6,6 +6,8 @@ import { User, UserDocument } from '../schemas/user.schema';
 import { Otp, OtpDocument } from '../schemas/otp.schema';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { GetOtpDto, ChangeTransactionPasswordDto } from '../dto/change-transaction-password.dto';
+import { AddUserDto } from '../dto/add-user.dto';
+import { UpdateUserDto } from '../dto/update-user.dto';
 import { EmailService } from './email.service';
 import { SmsService } from './sms.service';
 
@@ -239,6 +241,170 @@ export class UserService {
       return {
         status: 1,
         message: 'Transaction password updated successfully',
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Add new user
+  async addUser(addUserDto: AddUserDto) {
+    try {
+      // Check if user already exists with the same email
+      const existingUser = await this.userModel.findOne({ emailId: addUserDto.emailId });
+      if (existingUser) {
+        throw new ConflictException('User already exists with this email');
+      }
+
+      // Validate password
+      const isPasswordValid = await this.passwordValidation(addUserDto.password);
+      if (!isPasswordValid) {
+        throw new BadRequestException('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+      }
+
+      // Validate transaction password
+      const isTransactionPasswordValid = await this.passwordValidation(addUserDto.transactionPassword);
+      if (!isTransactionPasswordValid) {
+        throw new BadRequestException('Transaction password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+      }
+
+      // Encrypt passwords
+      const encryptedPassword = await this.ecryptPassword({ password: addUserDto.password });
+      const encryptedTransactionPassword = await this.ecryptPassword({ password: addUserDto.transactionPassword });
+
+      // Generate register ID
+      const registerId = `USER${Date.now()}`;
+
+      // Create new user with all fields from DTO and default values
+      const newUser = new this.userModel({
+        ...addUserDto,
+        password: encryptedPassword,
+        transactionPassword: encryptedTransactionPassword,
+        registerId,
+        userAddedDate: new Date(),
+        // Set default values for fields not provided in DTO
+        wallet: addUserDto.wallet ?? 0,
+        freezingAmount: addUserDto.freezingAmount ?? 0,
+        salarCoins: addUserDto.salarCoins ?? 0,
+        shoppingAmount: addUserDto.shoppingAmount ?? 0,
+        sponserCommission: addUserDto.sponserCommission ?? 0,
+        aurCommission: addUserDto.aurCommission ?? 0,
+        gameCommission: addUserDto.gameCommission ?? 0,
+        funds: addUserDto.funds ?? 0,
+        isDeleted: addUserDto.isDeleted ?? false,
+        status: addUserDto.status ?? true,
+        salesStatus: addUserDto.salesStatus ?? false,
+        orderProcessingStatus: addUserDto.orderProcessingStatus ?? false,
+        preferredLanguage: addUserDto.preferredLanguage ?? 'en',
+        // Set OTP to empty string initially
+        otp: ''
+      });
+
+      const savedUser = await newUser.save();
+
+      return {
+        status: 1,
+        message: 'User created successfully',
+        data: {
+          userId: savedUser._id,
+          fullName: savedUser.fullName,
+          emailId: savedUser.emailId,
+          mobileNo: savedUser.mobileNo,
+          role: savedUser.role,
+          registerId: savedUser.registerId
+        }
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get user by ID
+  async getUserById(userId: string) {
+    try {
+      const user = await this.userModel.findById(userId, {
+        password: 0,
+        transactionPassword: 0,
+        otp: 0
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      return {
+        status: 1,
+        message: 'User found successfully',
+        data: user
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Update user by ID
+  async updateUser(userId: string, updateUserDto: UpdateUserDto) {
+    try {
+      // Check if user exists
+      const existingUser = await this.userModel.findById(userId);
+      if (!existingUser) {
+        throw new NotFoundException('User not found');
+      }
+
+      // Prepare update data
+      const updateData: any = { ...updateUserDto };
+
+      // Handle password encryption if password is provided
+      if (updateUserDto.password) {
+        const isPasswordValid = await this.passwordValidation(updateUserDto.password);
+        if (!isPasswordValid) {
+          throw new BadRequestException('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+        }
+        updateData.password = await this.ecryptPassword({ password: updateUserDto.password });
+      }
+
+      // Handle transaction password encryption if provided
+      if (updateUserDto.transactionPassword) {
+        const isTransactionPasswordValid = await this.passwordValidation(updateUserDto.transactionPassword);
+        if (!isTransactionPasswordValid) {
+          throw new BadRequestException('Transaction password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+        }
+        updateData.transactionPassword = await this.ecryptPassword({ password: updateUserDto.transactionPassword });
+      }
+
+      // Check if email is being updated and if it already exists
+      if (updateUserDto.emailId && updateUserDto.emailId !== existingUser.emailId) {
+        const emailExists = await this.userModel.findOne({ 
+          emailId: updateUserDto.emailId,
+          _id: { $ne: userId } // Exclude current user
+        });
+        if (emailExists) {
+          throw new ConflictException('Email already exists with another user');
+        }
+      }
+
+      // Update user
+      const updatedUser = await this.userModel.findByIdAndUpdate(
+        userId,
+        updateData,
+        { new: true, runValidators: true }
+      );
+
+      if (!updatedUser) {
+        throw new BadRequestException('User update failed');
+      }
+
+      // Return updated user data (excluding sensitive information)
+      const userResponse = await this.userModel.findById(userId, {
+        password: 0,
+        transactionPassword: 0,
+        otp: 0
+      });
+
+      return {
+        status: 1,
+        message: 'User updated successfully',
+        data: userResponse
       };
     } catch (error) {
       throw error;

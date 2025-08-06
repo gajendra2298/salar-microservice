@@ -1,0 +1,1 @@
+{"version":3,"file":"get-wallet-balance.dto.js","sourceRoot":"","sources":["../../../../src/wallet/dto/get-wallet-balance.dto.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,qDAAuD;AACvD,6CAA8C;AAE9C,MAAa,mBAAmB;CAS/B;AATD,kDASC;AADC;IAPC,IAAA,qBAAW,EAAC;QACX,WAAW,EAAE,2DAA2D;QACxE,OAAO,EAAE,cAAc;QACvB,QAAQ,EAAE,IAAI;KACf,CAAC;IACD,IAAA,0BAAQ,GAAE;IACV,IAAA,4BAAU,GAAE;;mDACE"}

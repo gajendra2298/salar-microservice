@@ -18,16 +18,16 @@ const swagger_1 = require("@nestjs/swagger");
 const wallet_service_1 = require("./wallet.service");
 const update_wallet_dto_1 = require("./dto/update-wallet.dto");
 const wallet_response_dto_1 = require("./dto/wallet-response.dto");
-const mongoose_1 = require("mongoose");
+const get_wallet_balance_dto_1 = require("./dto/get-wallet-balance.dto");
 let WalletController = class WalletController {
     constructor(walletService) {
         this.walletService = walletService;
     }
-    async getWalletBalance(userId) {
-        if (!userId || !mongoose_1.Types.ObjectId.isValid(userId)) {
-            throw new common_1.BadRequestException('Invalid user ID');
+    async getWalletBalance(data) {
+        if (!data.userId) {
+            throw new common_1.BadRequestException('userId is required');
         }
-        const result = await this.walletService.getWalletBalance(userId);
+        const result = await this.walletService.getWalletBalance(data.userId);
         if (result.status === 0) {
             throw new common_1.HttpException(result.message, common_1.HttpStatus.BAD_REQUEST);
         }
@@ -36,9 +36,6 @@ let WalletController = class WalletController {
     async updateWalletBalance(updateWalletDto) {
         if (!updateWalletDto.userId) {
             throw new common_1.BadRequestException('userId is required');
-        }
-        if (!mongoose_1.Types.ObjectId.isValid(updateWalletDto.userId)) {
-            throw new common_1.BadRequestException('Invalid user ID');
         }
         const { userId, ...updates } = updateWalletDto;
         const result = await this.walletService.updateWalletBalance(userId, updates);
@@ -50,9 +47,9 @@ let WalletController = class WalletController {
 };
 exports.WalletController = WalletController;
 __decorate([
-    (0, common_1.Get)('balance/:userId'),
+    (0, common_1.Post)('balance'),
     (0, swagger_1.ApiOperation)({ summary: 'Get wallet balance for a user' }),
-    (0, swagger_1.ApiParam)({ name: 'userId', description: 'User ID (MongoDB ObjectId)', example: '507f1f77bcf86cd799439011' }),
+    (0, swagger_1.ApiBody)({ type: get_wallet_balance_dto_1.GetWalletBalanceDto }),
     (0, swagger_1.ApiResponse)({
         status: 200,
         description: 'Wallet balance retrieved successfully',
@@ -60,9 +57,9 @@ __decorate([
     }),
     (0, swagger_1.ApiResponse)({ status: 400, description: 'Invalid user ID' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: 'Wallet not found' }),
-    __param(0, (0, common_1.Param)('userId')),
+    __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [get_wallet_balance_dto_1.GetWalletBalanceDto]),
     __metadata("design:returntype", Promise)
 ], WalletController.prototype, "getWalletBalance", null);
 __decorate([

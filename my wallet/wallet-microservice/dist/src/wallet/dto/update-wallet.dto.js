@@ -17,12 +17,12 @@ class UpdateWalletDto {
 exports.UpdateWalletDto = UpdateWalletDto;
 __decorate([
     (0, swagger_1.ApiProperty)({
-        description: 'User ID (MongoDB ObjectId)',
-        example: '507f1f77bcf86cd799439011',
+        description: 'User ID (can be registerId, emailId, or MongoDB ObjectId)',
+        example: 'REG123456789',
         required: true
     }),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsMongoId)(),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], UpdateWalletDto.prototype, "userId", void 0);
 __decorate([

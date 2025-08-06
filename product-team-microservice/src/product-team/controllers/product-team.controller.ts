@@ -1,26 +1,24 @@
-import { Controller, Post, Get, Body, UseGuards, Request, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Controller, Post, Get, Body, Request, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { ProductTeamService } from '../services/product-team.service';
 import { GetPendingTeamMembersDto } from '../dto/get-pending-team-members.dto';
 import { AddTeamMemberDto } from '../dto/add-team-member.dto';
 import { GetTeamTreeDto } from '../dto/get-team-tree.dto';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { GetPendingLevelDetailsDto } from '../dto/get-pending-level-details.dto';
+import { GetNetworkCountDto } from '../dto/get-network-count.dto';
 
 @ApiTags('Product Team')
-@ApiBearerAuth()
 @Controller('product-team')
 export class ProductTeamController {
   constructor(private readonly productTeamService: ProductTeamService) {}
 
   @Post('pending-members')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get pending team members' })
   @ApiResponse({ status: 200, description: 'Pending team members retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getPendingTeamMembers(@Body() data: GetPendingTeamMembersDto, @Request() req) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = req.body?.userId || 'user123';
       const result = await this.productTeamService.getPendingTeamMembers(data, userId);
       return result;
     } catch (error) {
@@ -32,15 +30,14 @@ export class ProductTeamController {
     }
   }
 
-  @Get('pending-level-details')
-  @UseGuards(JwtAuthGuard)
+  @Post('pending-level-details')
   @ApiOperation({ summary: 'Get pending level details' })
+  @ApiBody({ type: GetPendingLevelDetailsDto })
   @ApiResponse({ status: 200, description: 'Pending level details retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getPendingLevelDetails(@Request() req) {
+  async getPendingLevelDetails(@Body() data: GetPendingLevelDetailsDto) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = data.userId || 'user123';
       const result = await this.productTeamService.getPendingLevelDetails(userId);
       return result;
     } catch (error) {
@@ -53,14 +50,12 @@ export class ProductTeamController {
   }
 
   @Post('add-team-member')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Add a new team member' })
   @ApiResponse({ status: 200, description: 'Team member added successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async addTeamMember(@Body() data: AddTeamMemberDto, @Request() req) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = req.body?.userId || 'user123';
       const result = await this.productTeamService.addTeamMember(data, userId);
       return result;
     } catch (error) {
@@ -72,15 +67,14 @@ export class ProductTeamController {
     }
   }
 
-  @Get('team-tree')
-  @UseGuards(JwtAuthGuard)
+  @Post('team-tree')
   @ApiOperation({ summary: 'Get team tree details for current user' })
+  @ApiBody({ type: GetTeamTreeDto })
   @ApiResponse({ status: 200, description: 'Team tree details retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getTeamTreeDetails(@Request() req) {
+  async getTeamTreeDetails(@Body() data: GetTeamTreeDto) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = data.userId || 'user123';
       const result = await this.productTeamService.getTeamTreeDetails(userId);
       return result;
     } catch (error) {
@@ -93,12 +87,10 @@ export class ProductTeamController {
   }
 
   @Get('team-tree/:registerId')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get team tree details by register ID' })
   @ApiParam({ name: 'registerId', description: 'Register ID of the user' })
   @ApiQuery({ name: 'level', description: 'Level depth for team tree', required: false })
   @ApiResponse({ status: 200, description: 'Team tree details retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getTeamTreeDetailsByRegisterId(@Param('registerId') registerId: string, @Query('level') level?: number) {
     try {
@@ -114,11 +106,9 @@ export class ProductTeamController {
   }
 
   @Get('first-level/:registerId')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get first level details by register ID' })
   @ApiParam({ name: 'registerId', description: 'Register ID of the user' })
   @ApiResponse({ status: 200, description: 'First level details retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
   async getFirstLevelDetails(@Param('registerId') registerId: string) {
     try {
@@ -133,15 +123,14 @@ export class ProductTeamController {
     }
   }
 
-  @Get('network-count')
-  @UseGuards(JwtAuthGuard)
+  @Post('network-count')
   @ApiOperation({ summary: 'Get network team count' })
+  @ApiBody({ type: GetNetworkCountDto })
   @ApiResponse({ status: 200, description: 'Network team count retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async getNetworkTeamCount(@Request() req) {
+  async getNetworkTeamCount(@Body() data: GetNetworkCountDto) {
     try {
-      const userId = req.user?.id || req.user?.userId;
+      const userId = data.userId || 'user123';
       const result = await this.productTeamService.getNetworkTeamCount(userId);
       return result;
     } catch (error) {

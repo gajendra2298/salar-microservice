@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const testing_1 = require("@nestjs/testing");
 const config_1 = require("@nestjs/config");
@@ -6,7 +9,7 @@ const mongoose_1 = require("@nestjs/mongoose");
 const wallet_schema_1 = require("../src/wallet/schemas/wallet.schema");
 const wallet_service_1 = require("../src/wallet/wallet.service");
 const wallet_controller_1 = require("../src/wallet/wallet.controller");
-const request = require("supertest");
+const supertest_1 = __importDefault(require("supertest"));
 const mongoose_2 = require("mongoose");
 describe('Wallet Microservice Integration Tests', () => {
     let app;
@@ -126,7 +129,7 @@ describe('Wallet Microservice Integration Tests', () => {
     describe('Wallet Controller Tests', () => {
         it('should get wallet balance via HTTP endpoint', async () => {
             const userId = new mongoose_2.Types.ObjectId();
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .get(`/wallet/balance/${userId}`)
                 .expect(200);
             expect(response.body).toHaveProperty('status', 1);
@@ -142,7 +145,7 @@ describe('Wallet Microservice Integration Tests', () => {
                 sponsorComm: 2000,
                 funds: 5000
             };
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .post('/wallet/update-balance')
                 .send(updateData)
                 .expect(201);
@@ -154,7 +157,7 @@ describe('Wallet Microservice Integration Tests', () => {
             expect(response.body.data).toHaveProperty('funds', 5000);
         });
         it('should return 400 for invalid user ID in GET request', async () => {
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .get('/wallet/balance/invalid-id')
                 .expect(400);
             expect(response.body).toHaveProperty('error', 'Bad Request');
@@ -166,7 +169,7 @@ describe('Wallet Microservice Integration Tests', () => {
                 referralComm: 1000,
                 sponsorComm: 2000
             };
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .post('/wallet/update-balance')
                 .send(updateData)
                 .expect(400);
@@ -179,7 +182,7 @@ describe('Wallet Microservice Integration Tests', () => {
                 userId: 'invalid-id',
                 referralComm: 1000
             };
-            const response = await request(app.getHttpServer())
+            const response = await (0, supertest_1.default)(app.getHttpServer())
                 .post('/wallet/update-balance')
                 .send(updateData)
                 .expect(400);

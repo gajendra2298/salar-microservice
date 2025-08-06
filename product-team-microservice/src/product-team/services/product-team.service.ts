@@ -2,22 +2,36 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { TeamLevels, TeamLevelsDocument } from '../schemas/team-levels.schema';
+import { TeamMember, TeamMemberDocument } from '../schemas/team-member.schema';
 import { GetPendingTeamMembersDto } from '../dto/get-pending-team-members.dto';
 import { AddTeamMemberDto } from '../dto/add-team-member.dto';
 import { GetTeamTreeDto } from '../dto/get-team-tree.dto';
+import * as mockUserData from '../mock-data/user-details.mock.json';
 import * as _ from 'lodash';
 
 @Injectable()
 export class ProductTeamService {
+  private mockUsers = mockUserData.users;
+
   constructor(
     @InjectModel(TeamLevels.name) private teamLevelsModel: Model<TeamLevelsDocument>,
+    @InjectModel(TeamMember.name) private teamMemberModel: Model<TeamMemberDocument>,
   ) {}
 
   async getPendingTeamMembers(data: GetPendingTeamMembersDto, userId: string): Promise<any> {
     try {
-      // This would typically connect to a Users collection
-      // For now, we'll return a mock response
-      const user = { registerId: 'TEST001' }; // Mock user
+      // Find user from mock data - try multiple ways to find the user
+      let user = this.mockUsers.find(u => u.registerId === userId);
+      
+      if (_.isEmpty(user)) {
+        // Try to find by _id if userId is a MongoDB ObjectId
+        user = this.mockUsers.find(u => u._id === userId);
+      }
+      
+      if (_.isEmpty(user)) {
+        // Try to find by emailId
+        user = this.mockUsers.find(u => u.emailId === userId);
+      }
       
       if (_.isEmpty(user)) {
         return {
@@ -26,41 +40,33 @@ export class ProductTeamService {
         };
       }
 
-      let query: any = {};
+      // Get pending users from mock data (users not in team)
+      let pendingUsers = this.mockUsers.filter(u => 
+        u.registerId !== userId && 
+        u.ulDownlineId === user.ulDownlineId &&
+        !u.isDeleted
+      );
+
+      // Apply search filter
       if (data.searchText) {
-        const regex = {
-          $regex: `.*${data.searchText}.*`,
-          $options: 'i',
-        };
-        query = {
-          $or: [
-            { emailId: regex },
-            { fullName: regex },
-            { organisationName: regex },
-            { registerId: regex },
-          ],
-        };
+        const searchText = data.searchText.toLowerCase();
+        pendingUsers = pendingUsers.filter(u =>
+          u.emailId.toLowerCase().includes(searchText) ||
+          u.fullName.toLowerCase().includes(searchText) ||
+          u.registerId.toLowerCase().includes(searchText)
+        );
       }
 
-      // Mock pending users - in real implementation, this would query the Users collection
-      const pendingUsers = [
-        {
-          _id: new Types.ObjectId(),
-          ulDownlineId: 'TEST001',
-          registerId: 'PEND001',
-          emailId: 'pending1@example.com',
-          fullName: 'Pending User 1',
-          organisationName: 'Test Org 1',
-        },
-        {
-          _id: new Types.ObjectId(),
-          ulDownlineId: 'TEST001',
-          registerId: 'PEND002',
-          emailId: 'pending2@example.com',
-          fullName: 'Pending User 2',
-          organisationName: 'Test Org 2',
-        },
-      ];
+      // Check if users are already in team (from MongoDB)
+      const teamMembers = await this.teamMemberModel.find({ 
+        isDeleted: false, 
+        status: true 
+      }).select('registerId');
+
+      const teamMemberIds = teamMembers.map(tm => tm.registerId);
+      
+      // Filter out users already in team
+      pendingUsers = pendingUsers.filter(u => !teamMemberIds.includes(u.registerId));
 
       return {
         status: 1,
@@ -74,7 +80,18 @@ export class ProductTeamService {
 
   async getPendingLevelDetails(userId: string): Promise<any> {
     try {
-      const user = { registerId: 'TEST001', fullName: 'Test User', organisationName: 'Test Org', emailId: 'test@example.com' };
+      // Find user from mock data - try multiple ways to find the user
+      let user = this.mockUsers.find(u => u.registerId === userId);
+      
+      if (_.isEmpty(user)) {
+        // Try to find by _id if userId is a MongoDB ObjectId
+        user = this.mockUsers.find(u => u._id === userId);
+      }
+      
+      if (_.isEmpty(user)) {
+        // Try to find by emailId
+        user = this.mockUsers.find(u => u.emailId === userId);
+      }
       
       if (_.isEmpty(user)) {
         return {
@@ -88,25 +105,30 @@ export class ProductTeamService {
         teamLevels = { depth: 1, width: 1 } as any;
       }
 
-      // Mock pending levels data
-      const pendingLevels = [
-        {
-          level: 1,
-          vacantPlace: 2,
-          fullName: user.fullName,
-          emailId: user.emailId,
-          registerId: user.registerId,
-          _id: new Types.ObjectId(),
-        },
-        {
-          level: 2,
-          vacantPlace: 3,
-          fullName: 'Level 2 User',
-          emailId: 'level2@example.com',
-          registerId: 'L2U001',
-          _id: new Types.ObjectId(),
-        },
-      ];
+      // Get team members from MongoDB
+      const teamMembers = await this.teamMemberModel.find({ 
+        isDeleted: false, 
+        status: true 
+      });
+
+      // Calculate pending levels based on actual team data
+      const pendingLevels = [];
+      
+      for (let level = 1; level <= teamLevels.depth; level++) {
+        const levelMembers = teamMembers.filter(tm => tm.level === level);
+        const vacantPlace = teamLevels.width - levelMembers.length;
+        
+        if (vacantPlace > 0) {
+          pendingLevels.push({
+            level,
+            vacantPlace,
+            fullName: user.fullName,
+            emailId: user.emailId,
+            registerId: user.registerId,
+            _id: new Types.ObjectId(),
+          });
+        }
+      }
 
       return {
         status: 1,
@@ -120,31 +142,56 @@ export class ProductTeamService {
 
   async addTeamMember(data: AddTeamMemberDto, userId: string): Promise<any> {
     try {
-      const user = { registerId: 'TEST001' };
+      // Find sponsor user from mock data - try multiple ways to find the user
+      let sponsorUser = this.mockUsers.find(u => u.registerId === userId);
       
-      if (_.isEmpty(user)) {
+      if (_.isEmpty(sponsorUser)) {
+        // Try to find by _id if userId is a MongoDB ObjectId
+        sponsorUser = this.mockUsers.find(u => u._id === userId);
+      }
+      
+      if (_.isEmpty(sponsorUser)) {
+        // Try to find by emailId
+        sponsorUser = this.mockUsers.find(u => u.emailId === userId);
+      }
+      
+      if (_.isEmpty(sponsorUser)) {
         return {
           status: 0,
-          message: 'User not found',
+          message: 'Sponsor user not found',
         };
       }
 
-      // Mock validation - in real implementation, this would validate against Users collection
-      const validUser = { _id: new Types.ObjectId(), level: -1 };
+      // Find team member user from mock data - try multiple ways to find the user
+      let teamMemberUser = this.mockUsers.find(u => u._id === data.teamMemberId);
       
-      if (_.isEmpty(validUser)) {
+      if (_.isEmpty(teamMemberUser)) {
+        // Try to find by registerId
+        teamMemberUser = this.mockUsers.find(u => u.registerId === data.teamMemberId);
+      }
+      
+      if (_.isEmpty(teamMemberUser)) {
+        // Try to find by emailId
+        teamMemberUser = this.mockUsers.find(u => u.emailId === data.teamMemberId);
+      }
+      
+      if (_.isEmpty(teamMemberUser)) {
+        return {
+          status: 0,
+          message: 'Team member user not found',
+        };
+      }
+
+      // Check if user is already in team (from MongoDB) - use the actual user ID from mock data
+      const existingTeamMember = await this.teamMemberModel.findOne({ 
+        userId: new Types.ObjectId(teamMemberUser._id),
+        isDeleted: false 
+      });
+      
+      if (existingTeamMember) {
         return {
           status: 0,
           message: 'User is already allocated to other team',
-        };
-      }
-
-      const teamMemberDetails = { registerId: 'TM001' };
-      
-      if (_.isEmpty(teamMemberDetails)) {
-        return {
-          status: 0,
-          message: 'User not found',
         };
       }
 
@@ -154,30 +201,60 @@ export class ProductTeamService {
         teamLevels = { width: 1 } as any;
       }
 
-      let level = -1;
-      const usersCount = 2; // Mock count
-      level = usersCount < teamLevels.width ? 1 : -1;
+      // Get current level members count from MongoDB for this sponsor
+      const currentLevelMembers = await this.teamMemberModel.countDocuments({ 
+        parentId: new Types.ObjectId(sponsorUser._id),
+        level: 1,
+        isDeleted: false, 
+        status: true 
+      });
 
-      if (level == -1) {
+      let level = 1; // Always start with level 1 for now
+      
+      // Check if there's space in level 1
+      if (currentLevelMembers >= teamLevels.width) {
         return {
           status: 0,
           message: 'There is no place for this user, under this team member',
         };
       }
 
-      // Mock update - in real implementation, this would update the Users collection
-      const updatedUser = { _id: new Types.ObjectId() };
+      // Create new team member in MongoDB
+      const newTeamMember = new this.teamMemberModel({
+        userId: new Types.ObjectId(teamMemberUser._id),
+        registerId: teamMemberUser.registerId,
+        sponsorId: sponsorUser.sponserId,
+        ulDownlineId: teamMemberUser.ulDownlineId,
+        level: level,
+        position: currentLevelMembers + 1,
+        parentId: new Types.ObjectId(sponsorUser._id),
+        joinedAt: new Date()
+      });
+
+      console.log('Saving team member:', {
+        userId: teamMemberUser._id,
+        registerId: teamMemberUser.registerId,
+        sponsorId: sponsorUser.sponserId,
+        level: level,
+        position: currentLevelMembers + 1,
+        parentId: sponsorUser._id
+      });
+
+      const savedTeamMember = await newTeamMember.save();
       
-      if (_.isEmpty(updatedUser)) {
+      if (_.isEmpty(savedTeamMember)) {
         return {
           status: 0,
           message: 'User details not updated',
         };
       }
 
+      console.log('Team member saved successfully:', savedTeamMember._id);
+
       return {
         status: 1,
         message: 'User details updated successfully',
+        data: savedTeamMember,
       };
     } catch (error) {
       console.log('error- ', error);
@@ -187,7 +264,18 @@ export class ProductTeamService {
 
   async getTeamTreeDetails(userId: string): Promise<any> {
     try {
-      const user = { registerId: 'TEST001' };
+      // Find user from mock data - try multiple ways to find the user
+      let user = this.mockUsers.find(u => u.registerId === userId);
+      
+      if (_.isEmpty(user)) {
+        // Try to find by _id if userId is a MongoDB ObjectId
+        user = this.mockUsers.find(u => u._id === userId);
+      }
+      
+      if (_.isEmpty(user)) {
+        // Try to find by emailId
+        user = this.mockUsers.find(u => u.emailId === userId);
+      }
       
       if (!user) {
         return {
@@ -202,72 +290,50 @@ export class ProductTeamService {
         teamLevels = { depth: 1, width: 1 } as any;
       }
 
-      // Mock team tree data
-      const levels = [
-        {
-          level: 1,
-          requiredMembers: teamLevels.width,
-          joinedMembers: 2,
-          status: 'Pending',
+      // Get team members from MongoDB
+      const teamMembers = await this.teamMemberModel.find({ 
+        isDeleted: false, 
+        status: true 
+      }).sort({ level: 1, position: 1 });
+
+      // Group team members by level
+      const levels = [];
+      
+      for (let level = 1; level <= teamLevels.depth; level++) {
+        const levelMembers = teamMembers.filter(tm => tm.level === level);
+        const requiredMembers = teamLevels.width * Math.pow(2, level - 1);
+        const joinedMembers = levelMembers.length;
+        const status = joinedMembers >= requiredMembers ? 'Completed' : 'Pending';
+        
+        // Get user details from mock data for each team member
+        const users = levelMembers.map(tm => {
+          const userDetails = this.mockUsers.find(u => u._id === tm.userId.toString());
+          return {
+            _id: tm._id,
+            registerId: tm.registerId,
+            emailId: userDetails?.emailId || '',
+            fullName: userDetails?.fullName || '',
+            imageUrl: userDetails?.imageUrl || '',
+            createdAt: tm.joinedAt,
+            gender: userDetails?.gender || 'male',
+            mainUser: {
+              _id: new Types.ObjectId(user._id),
+              fullName: user.fullName,
+              emailId: user.emailId,
+              registerId: user.registerId,
+            },
+          };
+        });
+
+        levels.push({
+          level,
+          requiredMembers,
+          joinedMembers,
+          status,
           earnings: 0,
-          users: [
-            {
-              _id: new Types.ObjectId(),
-              registerId: 'U001',
-              emailId: 'user1@example.com',
-              fullName: 'User 1',
-              imageUrl: 'https://example.com/image1.jpg',
-              createdAt: new Date(),
-              gender: 'male',
-              mainUser: {
-                _id: new Types.ObjectId(),
-                fullName: 'Main User',
-                emailId: 'main@example.com',
-                registerId: 'MAIN001',
-              },
-            },
-            {
-              _id: new Types.ObjectId(),
-              registerId: 'U002',
-              emailId: 'user2@example.com',
-              fullName: 'User 2',
-              imageUrl: 'https://example.com/image2.jpg',
-              createdAt: new Date(),
-              gender: 'female',
-              mainUser: {
-                _id: new Types.ObjectId(),
-                fullName: 'Main User',
-                emailId: 'main@example.com',
-                registerId: 'MAIN001',
-              },
-            },
-          ],
-        },
-        {
-          level: 2,
-          requiredMembers: teamLevels.width * 2,
-          joinedMembers: 3,
-          status: 'Pending',
-          earnings: 0,
-          users: [
-            {
-              _id: new Types.ObjectId(),
-              registerId: 'U003',
-              emailId: 'user3@example.com',
-              fullName: 'User 3',
-              imageUrl: 'https://example.com/image3.jpg',
-              createdAt: new Date(),
-              gender: 'male',
-              mainUser: {
-                _id: new Types.ObjectId(),
-                fullName: 'Level 1 User',
-                emailId: 'level1@example.com',
-                registerId: 'L1U001',
-              },
-            },
-          ],
-        },
-      ];
+          users,
+        });
+      }
 
       return {
         status: 1,
@@ -352,7 +418,18 @@ export class ProductTeamService {
 
   async getNetworkTeamCount(userId: string): Promise<any> {
     try {
-      const user = { registerId: 'TEST001' };
+      // Find user from mock data - try multiple ways to find the user
+      let user = this.mockUsers.find(u => u.registerId === userId);
+      
+      if (_.isEmpty(user)) {
+        // Try to find by _id if userId is a MongoDB ObjectId
+        user = this.mockUsers.find(u => u._id === userId);
+      }
+      
+      if (_.isEmpty(user)) {
+        // Try to find by emailId
+        user = this.mockUsers.find(u => u.emailId === userId);
+      }
       
       if (_.isEmpty(user)) {
         return {
@@ -361,18 +438,15 @@ export class ProductTeamService {
         };
       }
 
-      let teamLevels = await this.teamLevelsModel.findOne({ isDeleted: false, status: true }, { width: 1, depth: 1 });
-      
-      if (_.isEmpty(teamLevels)) {
-        teamLevels = { depth: 1, width: 1 } as any;
-      }
-
-      // Mock network team count
-      const count = { networkTeamCount: 5 };
+      // Get total team members count from MongoDB
+      const networkTeamCount = await this.teamMemberModel.countDocuments({ 
+        isDeleted: false, 
+        status: true 
+      });
 
       return {
         status: 1,
-        data: count,
+        data: { networkTeamCount },
       };
     } catch (error) {
       console.log('error- ', error);

@@ -5,7 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { WalletSchema } from '../src/wallet/schemas/wallet.schema';
 import { WalletService } from '../src/wallet/wallet.service';
 import { WalletController } from '../src/wallet/wallet.controller';
-import * as request from 'supertest';
+import request from 'supertest';
 import { Types } from 'mongoose';
 
 describe('Wallet Microservice Integration Tests', () => {

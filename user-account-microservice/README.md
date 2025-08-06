@@ -114,8 +114,27 @@ Authorization: Bearer <your-jwt-token>
 Required environment variables (see `env.example`):
 - `MONGODB_URI`: MongoDB connection string
 - `JWT_SECRET`: JWT secret key
-- `SEND_GRID_TOKEN`: SendGrid API key for email
+- `SMTP_HOST`: SMTP server host (e.g., smtp.gmail.com)
+- `SMTP_PORT`: SMTP server port (e.g., 587)
+- `SMTP_SECURE`: Use SSL/TLS (true/false)
+- `SMTP_USER`: SMTP username/email
+- `SMTP_PASSWORD`: SMTP password/app password
+- `SMTP_FROM`: From email address
 - `SMS_USER`: SMS gateway username
 - `SMS_PASSWORD`: SMS gateway password
 - `SMS_SENDER`: SMS sender ID
-- `PORT`: Server port (default: 3000) 
+- `PORT`: Server port (default: 3000)
+
+## Email Configuration
+
+This microservice uses SMTP for email delivery. See `SMTP_SETUP.md` for detailed configuration instructions.
+
+Popular SMTP providers:
+- **Gmail**: `smtp.gmail.com:587`
+- **Outlook**: `smtp-mail.outlook.com:587`
+- **Yahoo**: `smtp.mail.yahoo.com:587`
+
+For Gmail, you'll need to:
+1. Enable 2-factor authentication
+2. Generate an App Password
+3. Use the App Password as `SMTP_PASSWORD` 

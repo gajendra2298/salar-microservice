@@ -1,12 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document } from 'mongoose';
 
 export type CreditDebitDocument = CreditDebit & Document;
 
 @Schema({ timestamps: true })
 export class CreditDebit {
-  @Prop({ type: Types.ObjectId, ref: 'users', required: true })
-  userId: Types.ObjectId;
+  @Prop({type: String, required: true })
+  userId: string;
 
   @Prop({ type: String, required: true })
   reason: string;

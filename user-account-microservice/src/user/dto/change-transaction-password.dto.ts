@@ -1,7 +1,16 @@
-import { IsString, IsNotEmpty, MaxLength, Matches } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, Matches, IsMongoId } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class GetOtpDto {
+  @ApiProperty({
+    description: 'User ID',
+    example: '507f1f77bcf86cd799439011'
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsMongoId()
+  userId: string;
+
   @ApiProperty({
     description: 'Email address where OTP will be sent (auto-filled from signup)',
     example: 'user@example.com'
@@ -20,6 +29,15 @@ export class GetOtpDto {
 }
 
 export class ChangeTransactionPasswordDto {
+  @ApiProperty({
+    description: 'User ID',
+    example: '507f1f77bcf86cd799439011'
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsMongoId()
+  userId: string;
+
   @ApiProperty({
     description: '6-digit numeric OTP received via email and SMS',
     example: '123456',

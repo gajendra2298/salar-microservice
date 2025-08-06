@@ -26,16 +26,21 @@ export const addTeamMemberTestData = {
 export const getPendingTeamMembersTestData = {
   // With search text
   withSearch: {
+    userId: "REG123456789",
     searchText: "john"
   },
   // Without search text (empty request body)
-  withoutSearch: {},
+  withoutSearch: {
+    userId: "REG123456789"
+  },
   // With special characters in search
   specialCharacters: {
+    userId: "REG123456789",
     searchText: "john@123"
   },
   // Long search text
   longSearch: {
+    userId: "REG123456789",
     searchText: "verylongsearchtextthatmightexceedlimits"
   }
 };
@@ -44,20 +49,25 @@ export const getPendingTeamMembersTestData = {
 export const getTeamTreeTestData = {
   // With search text and level
   withSearchAndLevel: {
+    userId: "REG123456789",
     searchText: "alice",
     level: 3,
     registerId: "507f1f77bcf86cd799439011"
   },
   // With only level
   withLevelOnly: {
+    userId: "REG123456789",
     level: 2
   },
   // With only search text
   withSearchOnly: {
+    userId: "REG123456789",
     searchText: "bob"
   },
   // Empty request
-  empty: {}
+  empty: {
+    userId: "REG123456789"
+  }
 };
 
 // Mock response data for testing

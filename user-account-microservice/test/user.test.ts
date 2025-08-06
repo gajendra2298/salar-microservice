@@ -73,6 +73,7 @@ describe('UserService', () => {
       mockUserModel.findByIdAndUpdate.mockResolvedValue(mockUser);
       
       const changePasswordDto = {
+        userId: 'userId',
         oldPassword: 'OldPass123!',
         newPassword: 'NewPass123!',
         confirmPassword: 'NewPass123!',
@@ -107,6 +108,7 @@ describe('UserService', () => {
       mockUserModel.findOneAndUpdate.mockResolvedValue(mockUser);
 
       const getOtpDto = {
+        userId: 'userId',
         emailId: 'test@example.com',
         mobileNo: '+1234567890',
       };
@@ -129,6 +131,7 @@ describe('UserService', () => {
       mockUserModel.findByIdAndUpdate.mockResolvedValue(mockUser);
 
       const changeTransactionPasswordDto = {
+        userId: 'userId',
         otp: '123456',
         newTransactionPassword: 'NewTransPass123!',
         confirmTransactionPassword: 'NewTransPass123!',
